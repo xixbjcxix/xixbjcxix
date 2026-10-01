@@ -17,6 +17,10 @@ EDITABLE = {
     "strategy.cutoff_s.900": (float, 5, 600),
     "strategy.residual.enabled": (bool, None, None),
     "strategy.residual.max_usd": (float, 0, 10000),
+    "strategy.residual.min_edge": (float, 0, 0.5),
+    "strategy.vol_widen_per_unit": (float, 0, 1),
+    "strategy.adverse_skew_ticks": (float, 0, 10),
+    "strategy.max_legs_per_market": (float, 0, 100),
     "risk.max_order_usd": (float, 1, 100000),
     "risk.max_market_usd": (float, 1, 1000000),
     "risk.max_residual_usd": (float, 0, 100000),
@@ -140,6 +144,8 @@ button:disabled{opacity:.5;cursor:not-allowed}
  <div class="kpi"><span>Open orders</span><b id="k_orders">–</b></div>
  <div class="kpi"><span>Risk status</span><b id="k_risk">–</b></div>
 </div>
+<section><h2>PnL today <span id="eq_note" class="mut" style="text-transform:none;letter-spacing:0"></span></h2><div id="equity" style="padding:8px 12px"></div></section>
+<section><h2>Health &amp; fee audit</h2><div id="health"></div></section>
 <section><h2>Active markets</h2><div id="markets"></div></section>
 <section><h2 id="orders_h">Open orders</h2><div id="orders"></div></section>
 <section><h2>Risk limits</h2><div id="limits"></div></section>
@@ -150,6 +156,15 @@ button:disabled{opacity:.5;cursor:not-allowed}
 const TOKEN="__TOKEN__";
 const f=(x,d=2)=>x===null||x===undefined?"–":Number(x).toFixed(d);
 const cls=x=>x>0?"ok":x<0?"bad":"";
+function drawEquity(pts){const el=document.getElementById('equity');
+ if(pts.length<2){el.innerHTML='<span class="mut">collecting data…</span>';return}
+ const W=900,H=120,xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]);
+ const x0=xs[0],x1=xs[xs.length-1]||x0+1,lo=Math.min(0,...ys),hi=Math.max(0,...ys),span=(hi-lo)||1;
+ const X=t=>(t-x0)/((x1-x0)||1)*W,Y=v=>H-6-(v-lo)/span*(H-12);
+ const d=pts.map((p,i)=>(i?'L':'M')+X(p[0]).toFixed(1)+' '+Y(p[1]).toFixed(1)).join(' ');
+ const last=ys[ys.length-1],c=last>=0?'var(--good)':'var(--bad)';
+ el.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" width="100%" height="'+H+'" preserveAspectRatio="none"><line x1="0" x2="'+W+'" y1="'+Y(0)+'" y2="'+Y(0)+'" stroke="var(--line)" stroke-dasharray="4 4"/><path d="'+d+'" fill="none" stroke="'+c+'" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>';
+ document.getElementById('eq_note').textContent=' low '+f(Math.min(...ys))+' · high '+f(Math.max(...ys))+' · now '+f(last)}
 function tbl(cols,rows){if(!rows.length)return '<div class="empty">none</div>';
  return '<table><tr>'+cols.map(c=>'<th>'+c[0]+'</th>').join('')+'</tr>'+rows.map(r=>'<tr>'+cols.map(c=>'<td>'+c[1](r)+'</td>').join('')+'</tr>').join('')+'</table>'}
 async function tick(){
@@ -180,6 +195,16 @@ async function tick(){
  document.getElementById('orders').innerHTML=tbl([
   ['id',o=>o.id],['market',o=>o.market],['side',o=>(o.side==='BUY'?'buy ':'sell ')+o.outcome],['price',o=>f(o.price)],['size',o=>f(o.size,1)],
   ['filled',o=>f(o.filled,1)],['queue ahead',o=>f(o.queue_ahead,0)],['tag',o=>o.tag],['status',o=>o.status]],s.orders);
+ drawEquity(s.pnl_history||[]);
+ const h=s.health||{},fa=s.fee_audit||{};
+ const ageCls=h.data_age_s!=null&&h.data_age_s>10?'bad':'ok';
+ const up=h.uptime_s==null?'–':(h.uptime_s>=3600?f(h.uptime_s/3600,1)+' h':f(h.uptime_s/60,0)+' min');
+ const faTxt=s.mode==='paper'||s.mode==='record'?'n/a (simulated fills)':(fa.fills?('charged $'+f(fa.charged,2)+' vs modelled $'+f(fa.modeled,2)+' ('+(fa.drift_pct>0?'+':'')+f(fa.drift_pct,1)+'%)'):'no real fills yet');
+ document.getElementById('health').innerHTML=tbl([['uptime',x=>up],['restarts',x=>h.restarts||0],
+  ['last market data',x=>'<span class="'+ageCls+'">'+(h.data_age_s==null?'–':f(h.data_age_s,1)+' s ago')+'</span>'],
+  ['data gaps',x=>'<span class="'+(h.gaps?'warn':'')+'">'+(h.gaps||0)+'</span>'],['risk rejects',x=>h.rejects||0],
+  ['fee model vs Kalshi',x=>'<span class="'+(fa.flagged?'bad':'')+'">'+faTxt+(fa.flagged?' - MISMATCH':'')+'</span>']],[1])
+  +((s.recent_gaps||[]).length?'<div class="empty">recent gaps: '+s.recent_gaps.map(g=>new Date(g[0]).toLocaleTimeString()+' '+g[1]).join(' | ')+'</div>':'');
  document.getElementById('limits').innerHTML=tbl([['limit',x=>x[0]],['value',x=>x[1]]],
   Object.entries(s.risk).concat([['kill reason',s.kill_reason||'–'],['halt reason',s.halt_reason||'–'],
   ['recent rejects',(s.recent_rejects||[]).map(x=>x[2]).slice(-5).join(', ')||'–']]));
@@ -190,6 +215,10 @@ const FIELDS=[
  ['strategy.cutoff_s.900','Stop quoting N s before close','number','1'],
  ['strategy.residual.enabled','Allow directional residual','checkbox'],
  ['strategy.residual.max_usd','Max residual kept ($)','number','0.5'],
+ ['strategy.residual.min_edge','Min model edge to keep a leg ($/contract)','number','0.01'],
+ ['strategy.vol_widen_per_unit','Vol-aware entry: extra edge per unit vol spike','number','0.01'],
+ ['strategy.adverse_skew_ticks','Adverse-selection skew (ticks, 0=off)','number','1'],
+ ['strategy.max_legs_per_market','Max one-sided episodes per market (0=off)','number','1'],
  ['risk.max_order_usd','Max $ per order','number','1'],
  ['risk.max_market_usd','Max $ per market','number','1'],
  ['risk.max_residual_usd','Max unpaired $ per market','number','1'],

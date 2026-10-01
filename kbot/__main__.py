@@ -8,6 +8,7 @@
   demo      stage 2: REAL orders on Kalshi's demo environment (fake money), with dashboard
   replay    replay a recording through the dashboard at N x speed (offline)
   synth     write a SYNTHETIC recording (pipeline testing only - not evidence of edge)
+  report    daily report (net, paired/residual/cuts, fees, drawdown, risk events) from the trade database
   live      stage 3: REAL-MONEY orders on kalshi.com (needs --i-understand-real-money + typed START)
 """
 from __future__ import annotations
@@ -45,6 +46,10 @@ def standard_variants(cfg: BotConfig) -> List[Tuple[str, BotConfig]]:
         ("no maker fees (series without them)", with_overrides(r, **{"fees.profile": "kalshi_no_maker_fee"})),
         ("target pair cost 0.92", with_overrides(r, **{"strategy.target_pair_cost": 0.92})),
         ("target pair cost 0.96", with_overrides(r, **{"strategy.target_pair_cost": 0.96})),
+        ("no model-edge gate on residual", with_overrides(r, **{"strategy.residual.min_edge": 0.0})),
+        ("vol-aware entry (0.02/unit)", with_overrides(r, **{"strategy.vol_widen_per_unit": 0.02})),
+        ("adverse-selection skew 1 tick", with_overrides(r, **{"strategy.adverse_skew_ticks": 1})),
+        ("max 3 legs per market", with_overrides(r, **{"strategy.max_legs_per_market": 3})),
     ]
 
 
@@ -109,7 +114,6 @@ def cmd_synth(args, cfg: BotConfig) -> int:
 
 
 def _engine(mode: str, args, cfg: BotConfig) -> int:
-    from .engine import Engine
     if mode == "demo":
         from .collateral import prepare
         print("Checking cash on the demo crypto exchange...")
@@ -119,7 +123,41 @@ def _engine(mode: str, args, cfg: BotConfig) -> int:
                 print(f"  note: {msg}")
         except Exception as e:  # noqa: BLE001
             print(f"  could not check shard balances: {e}")
-    asyncio.run(Engine(cfg, mode, config_path=args.config).run(hours=args.hours))
+    _run_engine(cfg, mode, args)
+    return 0
+
+
+def _run_engine(cfg: BotConfig, mode: str, args) -> None:
+    """Run the engine once, or under the crash-restart supervisor with --supervise."""
+    from .engine import Engine
+    if not getattr(args, "supervise", False):
+        asyncio.run(Engine(cfg, mode, config_path=args.config).run(hours=args.hours))
+        return
+    from .ops import Notifier, supervise
+    note = Notifier(cfg.alerts, name=f"kbot {mode}")
+    deadline = time.time() + args.hours * 3600 if args.hours else None
+
+    async def once(attempt: int) -> None:
+        left = (deadline - time.time()) / 3600 if deadline else None
+        if left is not None and left <= 0:
+            return
+        eng = Engine(cfg, mode, config_path=args.config)
+        eng.core.restarts = attempt
+        await eng.run(hours=left)
+
+    n = asyncio.run(supervise(once, max_restarts=args.max_restarts, notify=note.send))
+    if n:
+        print(f"finished after {n} automatic restart(s)")
+
+
+def cmd_report(args, cfg: BotConfig) -> int:
+    from .dayreport import build_day_report, format_day_report
+    try:
+        r = build_day_report(args.db or cfg.db_path, args.day, args.mode)
+    except FileNotFoundError as e:
+        print(f"trade database not found: {e} (run `paper` or `demo` first)")
+        return 2
+    print(json.dumps(r, indent=2) if args.json else format_day_report(r))
     return 0
 
 
@@ -190,7 +228,7 @@ def cmd_live(args, cfg: BotConfig) -> int:
               "Run live again and answer y to the transfer, or move money between exchanges on kalshi.com.")
         return 1
     from .engine import Engine
-    asyncio.run(Engine(cfg, "live", config_path=args.config).run(hours=args.hours))
+    _run_engine(cfg, "live", args)
     return 0
 
 
@@ -215,6 +253,14 @@ def main(argv=None) -> int:
                     ("demo", "real orders on the demo exchange")):
         s = sub.add_parser(name, help=h)
         s.add_argument("--hours", type=float, default=None)
+        s.add_argument("--supervise", action="store_true",
+                       help="restart automatically after an unexpected crash (not after a kill switch)")
+        s.add_argument("--max-restarts", type=int, default=5, help="give up after this many crashes per hour")
+    s = sub.add_parser("report", help="daily report from the trade database")
+    s.add_argument("--day", help="UTC date YYYY-MM-DD (default today)")
+    s.add_argument("--mode", choices=["paper", "demo", "live"], help="only runs of this mode")
+    s.add_argument("--db")
+    s.add_argument("--json", action="store_true")
     s = sub.add_parser("backtest", help="replay a recording")
     s.add_argument("--db")
     s.add_argument("--compare", action="store_true")
@@ -234,12 +280,14 @@ def main(argv=None) -> int:
     s.add_argument("--i-understand-real-money", action="store_true")
     s.add_argument("--yes", action="store_true", help="skip the typed START confirmation")
     s.add_argument("--hours", type=float, default=None)
+    s.add_argument("--supervise", action="store_true", help="restart after an unexpected crash (never after a kill)")
+    s.add_argument("--max-restarts", type=int, default=5)
 
     args = p.parse_args(argv)
     _setup_logging(args.verbose)
     cfg = load_config(args.config)
     cmds = {"setup": cmd_setup, "check": cmd_check, "backtest": cmd_backtest, "synth": cmd_synth,
-            "replay": cmd_replay, "live": cmd_live,
+            "replay": cmd_replay, "live": cmd_live, "report": cmd_report,
             "record": lambda a, c: _engine("record", a, c), "paper": lambda a, c: _engine("paper", a, c),
             "demo": lambda a, c: _engine("demo", a, c)}
     return cmds[args.cmd](args, cfg)

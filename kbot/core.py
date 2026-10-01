@@ -19,6 +19,7 @@ from .config import BotConfig
 from .fees import FeeModel, fee_model_for
 from .fillmodel import SimExchange
 from .inventory import MarketInventory
+from .ops import FeeAudit, PnlHistory
 from .models import BUY, DOWN, OUTCOMES, SELL, UP, Fill, MarketInfo, Order, OrderStatus, Trade, other, px
 from .risk import RiskManager
 from .signal import MomentumSignal, SignalReading, SpotTracker
@@ -93,6 +94,13 @@ class TradingCore:
         self.status_message = ""          # shown at the top of the dashboard (startup problems etc.)
         self.blocked_markets: set = set()  # markets you already held a position in: the bot won't touch them
         self.trading_enabled = True      # False during replay warm-up (books/spot only)
+        a = cfg.alerts
+        self.fee_audit = FeeAudit(a.fee_drift_tolerance, a.fee_drift_min_fills)
+        self.pnl_hist = PnlHistory()
+        self.notify: Callable[[str, str], object] = lambda kind, text: None   # engine installs the Notifier
+        self.restarts = 0                 # set by the supervisor
+        self._halts_seen = 0
+        self.started_ms = 0
 
     # ---- setup -------------------------------------------------------------------------
     def _fee_for_market(self, slug: str) -> FeeModel:
@@ -187,6 +195,7 @@ class TradingCore:
         if self.data_ok:
             self.gaps.append((now_ms, reason))
             self.store.risk_event(self.run_id, now_ms, "data_gap", reason)
+            self.notify("data_gap", f"market-data gap ({reason}): all orders cancelled, waiting for fresh books")
         self.data_ok = False
         self.data_gap_reason = reason
         self.books.invalidate_all()
@@ -228,7 +237,14 @@ class TradingCore:
         if day != self.day_start_ms:
             self.day_start_ms = day
             self.day_realized = 0.0
-        self.risk.check_daily_loss(self.pnl_today(), now_ms)
+        pnl = self.pnl_today()
+        self.risk.check_daily_loss(pnl, now_ms)
+        if len(self.risk.halts) > self._halts_seen:
+            self._halts_seen = len(self.risk.halts)
+            self.notify("daily_loss_halt", f"daily loss limit hit ({self.risk.halt_reason}): no new orders "
+                                           f"until the next UTC day")
+        if self.mode != "backtest":
+            self.pnl_hist.add(now_ms, pnl)
         if self.risk.blocked(now_ms):
             self.cancel_all(now_ms, "blocked")
         for st in list(self._live.values()):
@@ -384,6 +400,8 @@ class TradingCore:
                 self._cancel(o, now, why)
 
     def kill(self, reason: str) -> None:
+        if not self.risk.killed:
+            self.notify("kill", f"KILL SWITCH tripped: {reason}. Orders cancelled; trading is stopped until restart.")
         self.risk.kill(reason, self.now_ms)
         self.store.risk_event(self.run_id, self.now_ms, "kill", reason)
         self.cancel_all(self.now_ms, "killed")
@@ -407,6 +425,14 @@ class TradingCore:
                 if excess > 0:
                     inv.rescue_excess += excess * new_pairs
             self.fills.append(f)
+            if self.mode in ("demo", "live"):
+                msg = self.fee_audit.record(st.fee, f.liquidity, f.size, f.price, f.fee)
+                if msg:
+                    self.store.risk_event(self.run_id, f.ts_ms, "fee_drift", msg)
+                    self.notify("fee_drift", "fee model mismatch - " + msg + ". Pair-cost maths may be off; "
+                                "check `kbot check` fee settings.")
+                    if self.cfg.alerts.fee_drift_halt:
+                        self.kill("fee_drift: " + msg[:100])
             self.store.fill(self.run_id, f)
             self.store.order_event(self.run_id, f.order_id, "fill", f.ts_ms,
                                    f"{f.size}@{f.price} {f.liquidity}")
@@ -447,6 +473,10 @@ class TradingCore:
         st.settle_breakdown = b
         self.settlements.append(b)
         self.day_realized += b["total_pnl"]
+        big = self.cfg.alerts.big_loss_usd
+        if big and b["total_pnl"] <= -abs(big):
+            self.notify("big_loss", f"{st.info.slug} settled at {b['total_pnl']:+.2f} "
+                                    f"(residual {b['residual_shares']:g} sh, cuts {b['cut_pnl']:+.2f})")
         self.store.pnl(self.run_id, now, st.info.slug, "settle", b["total_pnl"],
                        {k: v for k, v in b.items() if k != "episodes"})
 
@@ -483,7 +513,13 @@ class TradingCore:
                "risk": {k: getattr(self.cfg.risk, k) for k in (
                    "max_order_usd", "max_market_usd", "max_residual_usd", "max_residual_shares",
                    "max_total_usd", "max_daily_loss_usd")},
-               "recent_rejects": self.risk.rejects[-10:], "markets": [], "orders": []}
+               "recent_rejects": self.risk.rejects[-10:], "markets": [], "orders": [],
+               "pnl_history": self.pnl_hist.as_list(), "fee_audit": self.fee_audit.snapshot(),
+               "health": {"gaps": len(self.gaps), "data_age_s": round((self.now_ms - self.last_pm_ms) / 1000, 1)
+                          if self.last_pm_ms else None,
+                          "uptime_s": round((self.now_ms - self.started_ms) / 1000) if self.started_ms else None,
+                          "restarts": self.restarts, "rejects": len(self.risk.rejects)},
+               "recent_gaps": [[t, r] for t, r in self.gaps[-5:]]}
         for st in sorted(self.active_markets(), key=lambda s: s.info.end_ms):
             m = st.info
             bu, bd = self.books.book(m.token_up), self.books.book(m.token_down)

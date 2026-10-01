@@ -113,10 +113,49 @@ Other commands:
 | `backtest --compare --jobs 2` | replay the recording through the strategy; prints the variant table |
 | `replay --speed 30` | replay a recording through the dashboard (offline) |
 | `synth --hours 24` | synthetic data for testing the pipeline (not evidence of edge) |
+| `report [--day YYYY-MM-DD] [--mode demo]` | daily report from the trade database: net, paired/residual/cuts, fees, drawdown, risk events |
+| `paper|demo|live ... --supervise` | auto-restart after an unexpected crash (never after a kill switch or bad key) |
 | `live --i-understand-real-money` | **real-money** trading on kalshi.com (see Stage 3) |
 
 Stop at any time with Ctrl-C. The bot cancels all orders on the way out. You can also trip the
 kill switch with `touch data/KILL`.
+
+---
+
+## Strategy, fee and ops upgrades (v2)
+
+**Strategy** (all in `strategy:` in `config.yaml`, all adjustable from the dashboard Settings panel):
+
+| setting | what it does | default |
+|---|---|---|
+| `residual.min_edge` | A leg only rides unpaired if the signal agrees **and** model P(win) - leg cost (incl. fee) >= this. Direction agreement alone can mean "already priced in". | 0.02 |
+| `vol_widen_per_unit` | When short-term volatility spikes above long-term (`signal.vol_short_lookback_s` vs `vol_lookback_s`), demand more edge: target -= this x (ratio - 1), capped by `max_vol_widen`. | 0 (off) |
+| `adverse_skew_ticks` | When spot is clearly moving one way (`adverse_guard_z`), lower the bid on the side it is moving *away from* (the one informed flow hits). | 0 (off) |
+| `max_legs_per_market` | Stop opening new two-sided quotes in a market after N one-sided episodes. | 0 (off) |
+
+Only `min_edge` is on by default. The other three are **off because the synthetic data cannot validate
+them**: the generator has no informed order flow, so every variant lands inside the noise. `backtest
+--compare` now includes each of them, so run it on your own `record`ed data and keep only what beats base
+by more than the printed `±`.
+
+**Fee audit.** In `demo` and `live`, every real fill's fee (`fee_cost` from Kalshi) is compared with the fee
+model. A single fill charged >2c more than modelled, or >25% over across 20+ fills, raises a `fee_drift` alert
+and a dashboard flag ("fee model vs Kalshi"). Set `alerts.fee_drift_halt: true` to also trip the kill switch.
+Undercharges are ignored (Kalshi rebates rounding over time, and some series charge no maker fee).
+
+**Alerts.** Put a Slack/Discord webhook in `.env` as `KBOT_ALERT_WEBHOOK`, and/or `KBOT_TELEGRAM_TOKEN` +
+`KBOT_TELEGRAM_CHAT`. Sent on: start/stop, kill switch, data gap, daily-loss halt, fee drift, a market settling
+at or below `-alerts.big_loss_usd`, engine restarts, and a daily summary at the UTC rollover. Each kind is rate
+limited (`alerts.min_interval_s`). With no secret set, alerts are only logged.
+
+**Supervisor.** `./kbot.sh demo --supervise` restarts the engine after an unexpected crash (a background task
+dying, an unhandled exception) with exponential backoff, up to `--max-restarts` (default 5) per hour. On every
+exit all of the bot's orders are cancelled first. It never restarts after the kill switch, a failed preflight,
+bad keys or Ctrl-C. Restarts are shown on the dashboard and sent as alerts. In `live` mode the typed START
+confirmation still happens once, before the first run.
+
+**Dashboard.** New: PnL-today equity curve, health panel (uptime, restarts, market-data age, data gaps, risk
+rejects, fee audit) and the new strategy knobs in Settings.
 
 ---
 

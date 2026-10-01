@@ -66,12 +66,19 @@ strategy:
     max_shares: 20
     max_usd: 8
     ride_when_agreeing: true
+    min_edge: 0.02                  # keep a leg only if model P(win) - leg cost incl. fee >= this ($/contract); 0 = direction only
+  vol_widen_per_unit: 0.0           # demand extra edge when short-term vol runs above long-term: target -= this x (ratio-1)
+  max_vol_widen: 0.04               # ...capped at this much ($ per pair)
+  adverse_skew_ticks: 0             # lower the bid on the side spot is moving AWAY from by this many ticks (0 = off)
+  adverse_guard_z: 1.0              # ...when |z| (distance to target in vol units) is at least this
+  max_legs_per_market: 0            # stop opening new two-sided quotes after this many one-sided episodes (0 = off)
 
 signal:
   lookback_s: 30                    # momentum window
   min_momentum_bps: 2
   min_z: 0.6                        # distance from target in volatility units
   vol_lookback_s: 900
+  vol_short_lookback_s: 120         # short window for the vol-regime ratio
   sigma_floor_per_sqrt_s: 0.00003
   spot_stale_ms: 5000
 
@@ -130,6 +137,15 @@ live:                               # REAL MONEY mode: `kbot live --i-understand
   max_residual_shares: 10
   max_total_usd: 60
   max_daily_loss_usd: 15
+
+alerts:                             # secrets go in .env (KBOT_ALERT_WEBHOOK, or KBOT_TELEGRAM_TOKEN + KBOT_TELEGRAM_CHAT)
+  enabled: true                     # without a secret, alerts are only logged
+  min_interval_s: 300               # same alert kind at most once per 5 min
+  big_loss_usd: 10                  # alert when one market settles at or below -this (0 = off)
+  daily_summary: true               # one summary message per UTC day
+  fee_drift_tolerance: 0.25         # alert if Kalshi charges >25% more fees than the model predicts...
+  fee_drift_min_fills: 20           # ...measured over at least this many real fills (also alerts on any fill >2c over)
+  fee_drift_halt: false             # true = also trip the kill switch on fee drift (strict)
 
 store_tob: true
 store_our_quotes: true

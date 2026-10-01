@@ -39,6 +39,9 @@ class ResidualConfig:
     # While the signal agrees, let the allowed part of the leg ride (stop working the other
     # side). False = keep completing it opportunistically at the target (locks the pair instead).
     ride_when_agreeing: bool = True
+    # Model-edge gate: keep a leg only if model P(win) - leg cost (incl. fee) >= this ($ per contract).
+    # Direction agreement alone says "spot is moving that way"; this also asks "is the price still cheap?"
+    min_edge: float = 0.02
 
 
 @dataclass
@@ -59,6 +62,17 @@ class StrategyConfig:
     taker_entry: bool = False
     taker_entry_pair_cost: float = 0.92
     no_new_legs_in_rescue: bool = True   # stop opening new two-sided quotes once rescue window starts
+    # Volatility-aware entry: when short-window vol runs above long-window vol (a regime spike), resting
+    # bids get filled by informed flow more often, so demand more edge: target -= vol_widen_per_unit *
+    # (vol_ratio - 1), capped at max_vol_widen. 0 = off.
+    vol_widen_per_unit: float = 0.0
+    max_vol_widen: float = 0.04
+    # Adverse-selection guard: when the spot signal points one way (|z| >= adverse_guard_z), the resting
+    # bid on the OTHER side is the one informed traders hit. Lower it by adverse_skew_ticks. 0 = off.
+    adverse_skew_ticks: int = 0
+    adverse_guard_z: float = 1.0
+    # Stop opening new two-sided quotes in a market after this many leg episodes (one-sided stretches). 0 = off.
+    max_legs_per_market: int = 0
     residual: ResidualConfig = field(default_factory=ResidualConfig)
 
     def cutoff_for(self, horizon_s: int) -> float:
@@ -117,7 +131,9 @@ class Strategy:
         if side is None:
             if in_rescue and c.no_new_legs_in_rescue:
                 return Plan(mode="late_flat")
-            self._base_quotes(plan, m, bu, bd, tick, fee, budget_usd)
+            if c.max_legs_per_market and len(inv.episodes) >= c.max_legs_per_market:
+                return Plan(mode="leg_limit")
+            self._base_quotes(plan, m, bu, bd, tick, fee, budget_usd, sig)
             return plan
 
         # ---- holding an unpaired leg -------------------------------------------------
@@ -129,7 +145,7 @@ class Strategy:
         b_long = books[side]
 
         allowed_sh = 0.0
-        if c.residual.enabled and sig.ok and sig.direction == side:
+        if c.residual.enabled and sig.ok and sig.direction == side and self._edge_ok(sig, side, cost):
             allowed_sh = min(c.residual.max_shares, c.residual.max_usd / max(raw_cost, 1e-6))
         excess = max(0.0, res_sh - allowed_sh)
         disagrees = (not sig.ok) or (sig.direction == short) or (not c.residual.enabled)
@@ -173,6 +189,19 @@ class Strategy:
         return plan
 
     # ---------------------------------------------------------------------------------
+    def _edge_ok(self, sig: SignalReading, side: str, cost_allin: float) -> bool:
+        need = self.cfg.residual.min_edge
+        if need <= 0:
+            return True
+        p = sig.p_side(side)
+        return p is not None and p - cost_allin >= need - 1e-12
+
+    def vol_widen(self, sig: Optional[SignalReading]) -> float:
+        c = self.cfg
+        if c.vol_widen_per_unit <= 0 or sig is None or not sig.ok:
+            return 0.0
+        return min(c.max_vol_widen, max(0.0, c.vol_widen_per_unit * (sig.vol_ratio - 1.0)))
+
     @staticmethod
     def _net_of_maker_fee(limit_allin: float, tick: float, fee: FeeModel) -> float:
         """Highest price p on the tick grid with p + maker_fee(p) <= limit_allin."""
@@ -195,23 +224,36 @@ class Strategy:
         return min(p, c.max_price)
 
     def _base_quotes(self, plan: Plan, m: MarketInfo, bu: OrderBook, bd: OrderBook,
-                     tick: float, fee: FeeModel, budget_usd: float = float("inf")) -> None:
+                     tick: float, fee: FeeModel, budget_usd: float = float("inf"),
+                     sig: Optional[SignalReading] = None) -> None:
         c = self.cfg
+        target = c.target_pair_cost - self.vol_widen(sig)
         mu, md = bu.mid(), bd.mid()
         if mu is None or md is None or mu + md <= 0:
             plan.mode = "no_mid"
             return
         fair_u = mu / (mu + md)
         fair_d = 1.0 - fair_u
-        half = (1.0 - c.target_pair_cost) / 2.0
+        half = (1.0 - target) / 2.0
         pu = self._passive_bid(bu, fair_u - half, tick)
         pd = self._passive_bid(bd, fair_d - half, tick)
         if pu is None or pd is None:
             plan.mode = "out_of_range"
             return
+        if c.adverse_skew_ticks and sig is not None and sig.ok and sig.direction is not None \
+                and abs(sig.z) >= c.adverse_guard_z:
+            # spot is moving toward `sig.direction`; the opposite outcome is getting cheaper for a reason
+            skew = c.adverse_skew_ticks * tick
+            if sig.direction == UP:
+                pd = tick_floor(px(pd - skew), tick)
+            else:
+                pu = tick_floor(px(pu - skew), tick)
+            if pu < c.min_price or pd < c.min_price:
+                plan.mode = "adverse_guard"
+                return
         guard = 0
         allin = lambda a, b: a + b + fee.maker_fee_per_share(a) + fee.maker_fee_per_share(b)  # noqa: E731
-        while allin(pu, pd) > c.target_pair_cost + 1e-9 and guard < 200:
+        while allin(pu, pd) > target + 1e-9 and guard < 200:
             if pu >= pd:
                 pu = px(pu - tick)
             else:

@@ -19,6 +19,7 @@ from typing import Optional
 
 from .config import BotConfig, credentials, to_dict
 from .core import TradingCore
+from .ops import Notifier
 from .dashboard import DashboardServer
 from .feeds.discovery import KalshiDiscovery
 from .feeds.kalshi_rest import KalshiRest
@@ -100,8 +101,12 @@ class Engine:
             self.core.trading_enabled = False
         self.stop = asyncio.Event()
         self.started_ms = now_ms()
+        self.core.started_ms = self.started_ms
+        self.notifier = Notifier(cfg.alerts, name=f"kbot {mode}")
+        self.core.notify = self.notifier.send
         self.index_seen_ms = 0
         self.feed = None
+        self.crashed: Optional[BaseException] = None
         self.fallback_task: Optional[asyncio.Task] = None
 
     # ---- callbacks ------------------------------------------------------------------------------
@@ -255,6 +260,25 @@ class Engine:
                      self.mode, s["pnl_today"], s["realized_total"], s["settled_markets"], len(s["orders"]),
                      s["data_ok"])
 
+    async def _daily_summary(self) -> None:
+        """At each UTC day rollover, send yesterday's numbers to the alert channel."""
+        if self.mode == "record" or not self.cfg.alerts.daily_summary:
+            return
+        from .dayreport import build_day_report, summary_line
+        import datetime as dt
+        day = dt.datetime.now(dt.timezone.utc).date()
+        while not self.stop.is_set():
+            await asyncio.sleep(30)
+            today = dt.datetime.now(dt.timezone.utc).date()
+            if today != day:
+                prev, day = day, today
+                try:
+                    self.store.flush()
+                    r = build_day_report(self.cfg.db_path, prev.isoformat(), self.mode)
+                    self.notifier.send("daily_summary", summary_line(r), force=True)
+                except Exception as e:  # noqa: BLE001
+                    log.warning("daily summary failed: %s", e)
+
     async def run(self, hours: Optional[float] = None) -> dict:
         loop = asyncio.get_running_loop()
         for sig in (signal.SIGINT, signal.SIGTERM):
@@ -290,12 +314,25 @@ class Engine:
         disc = KalshiDiscovery(self.rest, k.series, self.cfg.markets.assets, k.lookahead_windows)
         if self.trading:
             await self._preflight(disc)
+        if self.notifier.configured and self.mode != "record":
+            self.notifier.send("started", f"started ({self.run_id}); limits ${self.cfg.risk.max_total_usd:g} total, "
+                                          f"daily loss stop ${self.cfg.risk.max_daily_loss_usd:g}", force=True)
+        elif not self.notifier.configured and self.trading:
+            log.info("alerts: no webhook/Telegram secret in .env - alerts are logged only "
+                     "(see README 'Alerts')")
         tasks = [asyncio.create_task(self._discovery(disc)), asyncio.create_task(self.feed.run(self.stop)),
                  asyncio.create_task(self._index_watchdog()), asyncio.create_task(self._timer()),
-                 asyncio.create_task(self._status())]
+                 asyncio.create_task(self._status()), asyncio.create_task(self._daily_summary())]
         if self.trading:
             tasks += [asyncio.create_task(self.exchange.poll_fills_forever(self.stop)),
                       asyncio.create_task(self.exchange.reconcile_forever(self.stop))]
+        def _watch(t: asyncio.Task) -> None:
+            if not t.cancelled() and t.exception() is not None and self.crashed is None:
+                self.crashed = t.exception()
+                log.error("background task crashed: %r - shutting down safely", self.crashed)
+                self.stop.set()
+        for t in tasks:
+            t.add_done_callback(_watch)
         if hours:
             async def _deadline():
                 await asyncio.sleep(hours * 3600)
@@ -303,6 +340,10 @@ class Engine:
             tasks.append(asyncio.create_task(_deadline()))
         await self.stop.wait()
         log.info("stopping: cancelling all orders")
+        if self.mode != "record":
+            self.notifier.send("stopped", f"stopped ({'kill switch: ' + self.core.risk.kill_reason if self.core.risk.killed else 'clean'})",
+                               force=True)
+            await asyncio.sleep(0.3)
         self.core.cancel_all(now_ms(), "shutdown")
         if self.trading:
             try:
@@ -323,4 +364,6 @@ class Engine:
             self.rec.close()
         if self.mode != "record":
             print(format_report(rep))
+        if self.crashed is not None:
+            raise RuntimeError(f"background task crashed: {self.crashed!r}") from self.crashed
         return rep

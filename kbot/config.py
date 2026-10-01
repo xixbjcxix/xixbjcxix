@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 import yaml
 
 from .fillmodel import FillModelConfig
+from .ops import AlertsConfig
 from .risk import RiskConfig
 from .signal import SignalConfig
 from .strategy import ResidualConfig, StrategyConfig
@@ -122,6 +123,7 @@ class BotConfig:
     backtest: BacktestConfig = field(default_factory=BacktestConfig)
     dashboard: DashboardConfig = field(default_factory=DashboardConfig)
     live: LiveConfig = field(default_factory=LiveConfig)
+    alerts: AlertsConfig = field(default_factory=AlertsConfig)
     store_tob: bool = True
     store_our_quotes: bool = True
     record_raw_in_paper: bool = True
