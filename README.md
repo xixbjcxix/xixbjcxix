@@ -113,6 +113,7 @@ Other commands:
 | `backtest --compare --jobs 2` | replay the recording through the strategy; prints the variant table |
 | `replay --speed 30` | replay a recording through the dashboard (offline) |
 | `synth --hours 24` | synthetic data for testing the pipeline (not evidence of edge) |
+| `history [--env prod|demo] [--days 30]` | **your own account history** (read-only): fee calibration + per-market rebuild, saved to `data/history.db` and `reports/history-markets.csv` |
 | `report [--day YYYY-MM-DD] [--mode demo]` | daily report from the trade database: net, paired/residual/cuts, fees, drawdown, risk events |
 | `paper|demo|live ... --supervise` | auto-restart after an unexpected crash (never after a kill switch or bad key) |
 | `live --i-understand-real-money` | **real-money** trading on kalshi.com (see Stage 3) |
@@ -153,6 +154,23 @@ dying, an unhandled exception) with exponential backoff, up to `--max-restarts` 
 exit all of the bot's orders are cancelled first. It never restarts after the kill switch, a failed preflight,
 bad keys or Ctrl-C. Restarts are shown on the dashboard and sent as alerts. In `live` mode the typed START
 confirmation still happens once, before the first run.
+
+**Learning from your own history.** `./kbot.sh history` downloads your past fills from Kalshi (signed, read-only,
+nothing is ever ordered; add `--env demo` for the demo account) and keeps the crypto 15-minute ones in
+`data/history.db`. Re-running only fetches new fills. It prints:
+
+* **Fee calibration:** fees Kalshi actually charged vs the bot's fee model, for maker and taker fills separately,
+  plus the implied coefficient. Per-fill fees round *up* to the cent, so on small fills the implied coefficient
+  reads higher than the true one (0.0175 maker / 0.07 taker); judge the "charged vs modelled" percentage, and
+  use larger fills if you want a sharper read. A large positive drift means the pair-cost maths is too
+  optimistic; a lot of zero-fee fills means the series may not charge maker fees (then set
+  `fees.profile: kalshi_no_maker_fee`).
+* **Market rebuild:** your fills replayed through the bot's own inventory logic and settled with Kalshi's
+  official result: pair cost and edge, residual and cut PnL, fees, net, win rate, drawdown. This is how your
+  manual (or earlier bot) trading actually performed, in the same terms as the backtest.
+
+Your history contains your fills only, not the order books you traded against, so it calibrates fees and
+shows realised results but cannot replace `record` + `backtest` for testing quote placement and queue position.
 
 **Dashboard.** New: PnL-today equity curve, health panel (uptime, restarts, market-data age, data gaps, risk
 rejects, fee audit) and the new strategy knobs in Settings.

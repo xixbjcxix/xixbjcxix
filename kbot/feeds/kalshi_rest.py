@@ -225,6 +225,26 @@ class KalshiRest:
         r = await self.request("GET", "/portfolio/fills", params=p)
         return r.get("fills", [])
 
+    async def get_fills_all(self, min_ts: Optional[int] = None, max_ts: Optional[int] = None,
+                            max_rows: int = 100_000) -> List[dict]:
+        """Every fill in [min_ts, max_ts] (unix seconds), following the pagination cursor."""
+        out: List[dict] = []
+        cursor = None
+        while len(out) < max_rows:
+            p: Dict[str, Any] = {"limit": 1000}
+            if min_ts:
+                p["min_ts"] = min_ts
+            if max_ts:
+                p["max_ts"] = max_ts
+            if cursor:
+                p["cursor"] = cursor
+            r = await self.request("GET", "/portfolio/fills", params=p)
+            out.extend(r.get("fills", []))
+            cursor = r.get("cursor")
+            if not cursor or not r.get("fills"):
+                break
+        return out
+
     # ---- orders (V2) --------------------------------------------------------------------------
     async def create_order(self, ticker: str, outcome_yes: bool, buy: bool, price: float, count: float,
                            post_only: bool, tif: str = "good_till_canceled", reduce_only: bool = False,

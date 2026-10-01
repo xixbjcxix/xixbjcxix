@@ -8,6 +8,7 @@
   demo      stage 2: REAL orders on Kalshi's demo environment (fake money), with dashboard
   replay    replay a recording through the dashboard at N x speed (offline)
   synth     write a SYNTHETIC recording (pipeline testing only - not evidence of edge)
+  history   learn from YOUR Kalshi account history: fee calibration + per-market rebuild (read-only)
   report    daily report (net, paired/residual/cuts, fees, drawdown, risk events) from the trade database
   live      stage 3: REAL-MONEY orders on kalshi.com (needs --i-understand-real-money + typed START)
 """
@@ -150,6 +151,56 @@ def _run_engine(cfg: BotConfig, mode: str, args) -> None:
         print(f"finished after {n} automatic restart(s)")
 
 
+def cmd_history(args, cfg: BotConfig) -> int:
+    from .config import credentials
+    from .feeds.kalshi_rest import KalshiError, KalshiRest
+    from . import history as H
+    from .fees import fee_model_for
+    env = args.env
+    creds = credentials(cfg, env)
+    db = args.db or "data/history.db"
+    store = H.HistoryStore(db)
+    prefixes = list(cfg.kalshi.series.values())
+    if not args.offline:
+        if not creds:
+            print(f"No {env} API key found. Run `python -m kbot setup`, or use --offline to analyse saved history.")
+            return 1
+        rest = KalshiRest(cfg.kalshi.demo_rest if env == "demo" else cfg.kalshi.prod_rest,
+                          key_id=creds["key_id"], key_path=creds["key_path"])
+
+        async def go():
+            try:
+                return await H.pull(rest, store, prefixes, args.days, time.time())
+            finally:
+                await rest.close()
+        try:
+            st = asyncio.run(go())
+        except KalshiError as e:
+            print(f"Kalshi returned HTTP {e.status}: {e.body[:200]}")
+            return 1
+        except Exception as e:  # noqa: BLE001
+            print(f"Could not reach Kalshi ({type(e).__name__}: {e}).")
+            return 1
+        print(f"downloaded {st['downloaded']} fills ({st['new']} new), {st['markets']} crypto 15m markets, "
+              f"{st['results_fetched']} new results")
+    raws = store.fills(prefixes)
+    fills = [f for f in (H.parse_fill(r) for r in raws) if f]
+    if not fills:
+        print("no crypto 15-minute fills in your history yet - trade on demo/live first, or widen --days.")
+        return 2
+    fee_for = lambda t: fee_model_for(None, cfg.fees.profile, 1.0, False, cfg.fees.precision,  # noqa: E731
+                                      cfg.fees.default_fee_type)
+    cal = H.fee_calibration(fills, fee_for)
+    rows = H.rebuild_markets(fills, store.results(), fee_for)
+    summ = H.summarize(rows)
+    print(H.format_history(cal, summ, fee_for("")))
+    out = args.out or "reports/history-markets.csv"
+    H.write_csv(rows, out)
+    print(f"\nper-market table: {out}   raw fills: {db}")
+    store.close()
+    return 0
+
+
 def cmd_report(args, cfg: BotConfig) -> int:
     from .dayreport import build_day_report, format_day_report
     try:
@@ -256,6 +307,12 @@ def main(argv=None) -> int:
         s.add_argument("--supervise", action="store_true",
                        help="restart automatically after an unexpected crash (not after a kill switch)")
         s.add_argument("--max-restarts", type=int, default=5, help="give up after this many crashes per hour")
+    s = sub.add_parser("history", help="analyse your own Kalshi account history (read-only)")
+    s.add_argument("--env", choices=["prod", "demo"], default="prod")
+    s.add_argument("--days", type=float, default=30.0, help="how far back to download on the first run")
+    s.add_argument("--offline", action="store_true", help="skip the download, analyse data/history.db only")
+    s.add_argument("--db")
+    s.add_argument("--out")
     s = sub.add_parser("report", help="daily report from the trade database")
     s.add_argument("--day", help="UTC date YYYY-MM-DD (default today)")
     s.add_argument("--mode", choices=["paper", "demo", "live"], help="only runs of this mode")
@@ -287,7 +344,7 @@ def main(argv=None) -> int:
     _setup_logging(args.verbose)
     cfg = load_config(args.config)
     cmds = {"setup": cmd_setup, "check": cmd_check, "backtest": cmd_backtest, "synth": cmd_synth,
-            "replay": cmd_replay, "live": cmd_live, "report": cmd_report,
+            "replay": cmd_replay, "live": cmd_live, "report": cmd_report, "history": cmd_history,
             "record": lambda a, c: _engine("record", a, c), "paper": lambda a, c: _engine("paper", a, c),
             "demo": lambda a, c: _engine("demo", a, c)}
     return cmds[args.cmd](args, cfg)
