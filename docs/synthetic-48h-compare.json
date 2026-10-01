@@ -1,0 +1,857 @@
+{
+  "recording": "/tmp/claude-0/-home-claude/3012cb0a-c6c4-5a18-aa2a-9ee3abc00274/scratchpad/k48.db",
+  "results": [
+    {
+      "label": "base, daily-loss halt ON (as configured)",
+      "unsettled_positions": {
+        "markets": 0,
+        "paired_shares": 0,
+        "residual_usd": 0,
+        "mtm_pnl": 0
+      },
+      "fee_profile": "kalshi",
+      "hours": 48.01,
+      "markets_seen": 384,
+      "markets_traded": 328,
+      "fills": 2995,
+      "maker_fills": 2673,
+      "taker_fills": 322,
+      "fills_per_hour": 62.4,
+      "shares_bought": 19970.0,
+      "avg_pair_cost": 0.9038,
+      "pair_edge_cents": 9.62,
+      "pair_edge_after_fees_cents": 8.41,
+      "paired_shares": 9210.7,
+      "capital_paired_usd": 8324.17,
+      "capital_residual_usd": 187.78,
+      "pct_capital_paired": 97.8,
+      "paired_pnl": 886.52,
+      "residual_pnl": -172.31,
+      "cut_pnl": -424.35,
+      "fees_paid": 111.74,
+      "maker_fees": 96.18,
+      "taker_fees": 15.56,
+      "fees_per_pair_cents": 1.21,
+      "maker_rebates_est": 0.0,
+      "net_pnl": 178.13,
+      "net_pnl_ex_rebates": 178.13,
+      "net_pnl_se": 55.3,
+      "max_drawdown": -27.81,
+      "pnl_per_traded_market_mean": 0.543,
+      "pnl_per_traded_market_stdev": 3.053,
+      "worst_market_pnl": -9.2,
+      "best_market_pnl": 9.22,
+      "legging": {
+        "episodes": 1342,
+        "pct_legs_completed": 85.8,
+        "pct_legs_over_30s": 48.9,
+        "pct_legs_over_60s": 36.2,
+        "pct_traded_markets_resolving_with_residual": 15.9,
+        "median_time_one_sided_s": 28.4,
+        "p90_time_one_sided_s": 555.7,
+        "closed_by": {
+          "taker_complete": 114,
+          "passive": 1037,
+          "cut": 138,
+          "resolution": 52,
+          "flip": 1
+        },
+        "residual_pnl_when_held": -172.31,
+        "residual_win_rate_pct": 3.8,
+        "rescue_excess_paid": 7.31,
+        "cost_of_legging": 603.96
+      },
+      "adverse_selection_cents": {
+        "10s": {
+          "mean": 0.98,
+          "pct_adverse": 39.6,
+          "n": 2673
+        },
+        "30s": {
+          "mean": 0.86,
+          "pct_adverse": 44.7,
+          "n": 2673
+        }
+      },
+      "by_bucket": {
+        "btc-15m": {
+          "markets": 192,
+          "traded": 164,
+          "pnl": 73.11,
+          "paired_shares": 4406.859999999999,
+          "residual_pnl": -94.91,
+          "fees": 54.52,
+          "pair_edge_c": 9.73
+        },
+        "eth-15m": {
+          "markets": 192,
+          "traded": 164,
+          "pnl": 105.02,
+          "paired_shares": 4803.830000000001,
+          "residual_pnl": -77.4,
+          "fees": 57.22,
+          "pair_edge_c": 9.53
+        }
+      },
+      "risk_rejects": {
+        "residual_usd": 3651,
+        "rate_limit": 369,
+        "max_market_usd": 15,
+        "max_order_usd": 260
+      },
+      "postonly_or_venue_rejects": 20,
+      "data_gaps": 12,
+      "winners_inferred_from_spot": 0,
+      "daily_loss_halts": 1,
+      "killed": null,
+      "run_id": "bt-base, daily-loss halt ON (as configured)-f75e99",
+      "wall_s": 197.3,
+      "rows": 4950013
+    },
+    {
+      "label": "base (residual gated by signal)",
+      "unsettled_positions": {
+        "markets": 0,
+        "paired_shares": 0,
+        "residual_usd": 0,
+        "mtm_pnl": 0
+      },
+      "fee_profile": "kalshi",
+      "hours": 48.01,
+      "markets_seen": 384,
+      "markets_traded": 384,
+      "fills": 3492,
+      "maker_fills": 3125,
+      "taker_fills": 367,
+      "fills_per_hour": 72.7,
+      "shares_bought": 23229.8,
+      "avg_pair_cost": 0.9041,
+      "pair_edge_cents": 9.59,
+      "pair_edge_after_fees_cents": 8.38,
+      "paired_shares": 10707.8,
+      "capital_paired_usd": 9680.46,
+      "capital_residual_usd": 190.94,
+      "pct_capital_paired": 98.1,
+      "paired_pnl": 1027.29,
+      "residual_pnl": -190.94,
+      "cut_pnl": -519.82,
+      "fees_paid": 129.91,
+      "maker_fees": 112.02,
+      "taker_fees": 17.89,
+      "fees_per_pair_cents": 1.21,
+      "maker_rebates_est": 0.0,
+      "net_pnl": 186.62,
+      "net_pnl_ex_rebates": 186.62,
+      "net_pnl_se": 58.85,
+      "max_drawdown": -27.81,
+      "pnl_per_traded_market_mean": 0.486,
+      "pnl_per_traded_market_stdev": 3.003,
+      "worst_market_pnl": -9.2,
+      "best_market_pnl": 9.22,
+      "legging": {
+        "episodes": 1560,
+        "pct_legs_completed": 85.5,
+        "pct_legs_over_30s": 49.0,
+        "pct_legs_over_60s": 36.7,
+        "pct_traded_markets_resolving_with_residual": 14.3,
+        "median_time_one_sided_s": 28.7,
+        "p90_time_one_sided_s": 556.5,
+        "closed_by": {
+          "taker_complete": 126,
+          "passive": 1208,
+          "cut": 169,
+          "resolution": 55,
+          "flip": 2
+        },
+        "residual_pnl_when_held": -190.94,
+        "residual_win_rate_pct": 0.0,
+        "rescue_excess_paid": 8.42,
+        "cost_of_legging": 719.18
+      },
+      "adverse_selection_cents": {
+        "10s": {
+          "mean": 0.91,
+          "pct_adverse": 39.6,
+          "n": 3125
+        },
+        "30s": {
+          "mean": 0.88,
+          "pct_adverse": 44.5,
+          "n": 3125
+        }
+      },
+      "by_bucket": {
+        "btc-15m": {
+          "markets": 192,
+          "traded": 192,
+          "pnl": 52.89,
+          "paired_shares": 5077.439999999999,
+          "residual_pnl": -103.8,
+          "fees": 62.92,
+          "pair_edge_c": 9.49
+        },
+        "eth-15m": {
+          "markets": 192,
+          "traded": 192,
+          "pnl": 133.72,
+          "paired_shares": 5630.310000000001,
+          "residual_pnl": -87.15,
+          "fees": 66.99,
+          "pair_edge_c": 9.69
+        }
+      },
+      "risk_rejects": {
+        "residual_usd": 4152,
+        "rate_limit": 369,
+        "max_market_usd": 15,
+        "max_order_usd": 260
+      },
+      "postonly_or_venue_rejects": 30,
+      "data_gaps": 12,
+      "winners_inferred_from_spot": 0,
+      "daily_loss_halts": 0,
+      "killed": null,
+      "run_id": "bt-base (residual gated by signal)-296e34",
+      "wall_s": 208.7,
+      "rows": 4950013
+    },
+    {
+      "label": "no residual (always pair or cut)",
+      "unsettled_positions": {
+        "markets": 0,
+        "paired_shares": 0,
+        "residual_usd": 0,
+        "mtm_pnl": 0
+      },
+      "fee_profile": "kalshi",
+      "hours": 48.01,
+      "markets_seen": 384,
+      "markets_traded": 384,
+      "fills": 4148,
+      "maker_fills": 3696,
+      "taker_fills": 452,
+      "fills_per_hour": 86.4,
+      "shares_bought": 26736.7,
+      "avg_pair_cost": 0.9467,
+      "pair_edge_cents": 5.33,
+      "pair_edge_after_fees_cents": 4.12,
+      "paired_shares": 12794.7,
+      "capital_paired_usd": 12113.24,
+      "capital_residual_usd": 125.88,
+      "pct_capital_paired": 99.0,
+      "paired_pnl": 681.43,
+      "residual_pnl": -125.88,
+      "cut_pnl": -342.04,
+      "fees_paid": 154.12,
+      "maker_fees": 127.52,
+      "taker_fees": 26.6,
+      "fees_per_pair_cents": 1.2,
+      "maker_rebates_est": 0.0,
+      "net_pnl": 59.39,
+      "net_pnl_ex_rebates": 59.39,
+      "net_pnl_se": 40.96,
+      "max_drawdown": -46.54,
+      "pnl_per_traded_market_mean": 0.155,
+      "pnl_per_traded_market_stdev": 2.09,
+      "worst_market_pnl": -9.2,
+      "best_market_pnl": 3.76,
+      "legging": {
+        "episodes": 1814,
+        "pct_legs_completed": 90.6,
+        "pct_legs_over_30s": 27.2,
+        "pct_legs_over_60s": 20.5,
+        "pct_traded_markets_resolving_with_residual": 10.2,
+        "median_time_one_sided_s": 6.7,
+        "p90_time_one_sided_s": 305.2,
+        "closed_by": {
+          "taker_complete": 214,
+          "passive": 1429,
+          "cut": 126,
+          "resolution": 39,
+          "flip": 6
+        },
+        "residual_pnl_when_held": -125.88,
+        "residual_win_rate_pct": 0.0,
+        "rescue_excess_paid": 328.31,
+        "cost_of_legging": 796.23
+      },
+      "adverse_selection_cents": {
+        "10s": {
+          "mean": 0.71,
+          "pct_adverse": 39.2,
+          "n": 3696
+        },
+        "30s": {
+          "mean": 0.69,
+          "pct_adverse": 44.6,
+          "n": 3696
+        }
+      },
+      "by_bucket": {
+        "btc-15m": {
+          "markets": 192,
+          "traded": 192,
+          "pnl": 9.39,
+          "paired_shares": 6219.8899999999985,
+          "residual_pnl": -73.44,
+          "fees": 73.9,
+          "pair_edge_c": 5.2
+        },
+        "eth-15m": {
+          "markets": 192,
+          "traded": 192,
+          "pnl": 50.0,
+          "paired_shares": 6574.7800000000025,
+          "residual_pnl": -52.44,
+          "fees": 80.22,
+          "pair_edge_c": 5.44
+        }
+      },
+      "risk_rejects": {
+        "residual_usd": 3385,
+        "rate_limit": 394,
+        "max_order_usd": 501
+      },
+      "postonly_or_venue_rejects": 29,
+      "data_gaps": 12,
+      "winners_inferred_from_spot": 0,
+      "daily_loss_halts": 0,
+      "killed": null,
+      "run_id": "bt-no residual (always pair or cut)-b4d8d0",
+      "wall_s": 212.4,
+      "rows": 4950013
+    },
+    {
+      "label": "residual allowed but still completed",
+      "unsettled_positions": {
+        "markets": 0,
+        "paired_shares": 0,
+        "residual_usd": 0,
+        "mtm_pnl": 0
+      },
+      "fee_profile": "kalshi",
+      "hours": 48.01,
+      "markets_seen": 384,
+      "markets_traded": 384,
+      "fills": 3451,
+      "maker_fills": 3158,
+      "taker_fills": 293,
+      "fills_per_hour": 71.9,
+      "shares_bought": 23179.6,
+      "avg_pair_cost": 0.9113,
+      "pair_edge_cents": 8.87,
+      "pair_edge_after_fees_cents": 7.67,
+      "paired_shares": 10682.8,
+      "capital_paired_usd": 9735.54,
+      "capital_residual_usd": 190.99,
+      "pct_capital_paired": 98.1,
+      "paired_pnl": 947.24,
+      "residual_pnl": -190.99,
+      "cut_pnl": -527.29,
+      "fees_paid": 127.78,
+      "maker_fees": 113.17,
+      "taker_fees": 14.61,
+      "fees_per_pair_cents": 1.2,
+      "maker_rebates_est": 0.0,
+      "net_pnl": 101.18,
+      "net_pnl_ex_rebates": 101.18,
+      "net_pnl_se": 54.22,
+      "max_drawdown": -30.23,
+      "pnl_per_traded_market_mean": 0.263,
+      "pnl_per_traded_market_stdev": 2.767,
+      "worst_market_pnl": -9.2,
+      "best_market_pnl": 4.92,
+      "legging": {
+        "episodes": 1557,
+        "pct_legs_completed": 85.5,
+        "pct_legs_over_30s": 48.9,
+        "pct_legs_over_60s": 36.8,
+        "pct_traded_markets_resolving_with_residual": 14.3,
+        "median_time_one_sided_s": 28.7,
+        "p90_time_one_sided_s": 553.1,
+        "closed_by": {
+          "taker_complete": 94,
+          "passive": 1237,
+          "cut": 168,
+          "resolution": 55,
+          "flip": 3
+        },
+        "residual_pnl_when_held": -190.99,
+        "residual_win_rate_pct": 0.0,
+        "rescue_excess_paid": 8.14,
+        "cost_of_legging": 726.42
+      },
+      "adverse_selection_cents": {
+        "10s": {
+          "mean": 0.56,
+          "pct_adverse": 40.2,
+          "n": 3158
+        },
+        "30s": {
+          "mean": 0.56,
+          "pct_adverse": 45.1,
+          "n": 3158
+        }
+      },
+      "by_bucket": {
+        "btc-15m": {
+          "markets": 192,
+          "traded": 192,
+          "pnl": 6.18,
+          "paired_shares": 5066.349999999999,
+          "residual_pnl": -103.84,
+          "fees": 61.85,
+          "pair_edge_c": 8.67
+        },
+        "eth-15m": {
+          "markets": 192,
+          "traded": 192,
+          "pnl": 95.0,
+          "paired_shares": 5616.430000000002,
+          "residual_pnl": -87.15,
+          "fees": 65.93,
+          "pair_edge_c": 9.05
+        }
+      },
+      "risk_rejects": {
+        "residual_usd": 4085,
+        "rate_limit": 421,
+        "max_market_usd": 15,
+        "max_order_usd": 260
+      },
+      "postonly_or_venue_rejects": 33,
+      "data_gaps": 12,
+      "winners_inferred_from_spot": 0,
+      "daily_loss_halts": 0,
+      "killed": null,
+      "run_id": "bt-residual allowed but still completed-c3c907",
+      "wall_s": 214.3,
+      "rows": 4950013
+    },
+    {
+      "label": "hold legs to expiry (no rescue/cut)",
+      "unsettled_positions": {
+        "markets": 0,
+        "paired_shares": 0,
+        "residual_usd": 0,
+        "mtm_pnl": 0
+      },
+      "fee_profile": "kalshi",
+      "hours": 48.01,
+      "markets_seen": 384,
+      "markets_traded": 384,
+      "fills": 3369,
+      "maker_fills": 3174,
+      "taker_fills": 195,
+      "fills_per_hour": 70.2,
+      "shares_bought": 23591.7,
+      "avg_pair_cost": 0.9031,
+      "pair_edge_cents": 9.69,
+      "pair_edge_after_fees_cents": 8.52,
+      "paired_shares": 10839.7,
+      "capital_paired_usd": 9788.84,
+      "capital_residual_usd": 815.47,
+      "pct_capital_paired": 92.3,
+      "paired_pnl": 1050.87,
+      "residual_pnl": -716.42,
+      "cut_pnl": 0.0,
+      "fees_paid": 127.73,
+      "maker_fees": 113.69,
+      "taker_fees": 14.04,
+      "fees_per_pair_cents": 1.18,
+      "maker_rebates_est": 0.0,
+      "net_pnl": 206.72,
+      "net_pnl_ex_rebates": 206.72,
+      "net_pnl_se": 64.41,
+      "max_drawdown": -35.15,
+      "pnl_per_traded_market_mean": 0.538,
+      "pnl_per_traded_market_stdev": 3.287,
+      "worst_market_pnl": -9.2,
+      "best_market_pnl": 9.99,
+      "legging": {
+        "episodes": 1594,
+        "pct_legs_completed": 84.8,
+        "pct_legs_over_30s": 49.1,
+        "pct_legs_over_60s": 37.1,
+        "pct_traded_markets_resolving_with_residual": 62.5,
+        "median_time_one_sided_s": 28.9,
+        "p90_time_one_sided_s": 590.8,
+        "closed_by": {
+          "passive": 1219,
+          "resolution": 240,
+          "taker_complete": 133,
+          "flip": 2
+        },
+        "residual_pnl_when_held": -716.42,
+        "residual_win_rate_pct": 5.8,
+        "rescue_excess_paid": 0.1,
+        "cost_of_legging": 716.52
+      },
+      "adverse_selection_cents": {
+        "10s": {
+          "mean": 0.87,
+          "pct_adverse": 39.9,
+          "n": 3174
+        },
+        "30s": {
+          "mean": 0.8,
+          "pct_adverse": 44.8,
+          "n": 3174
+        }
+      },
+      "by_bucket": {
+        "btc-15m": {
+          "markets": 192,
+          "traded": 192,
+          "pnl": 62.15,
+          "paired_shares": 5145.729999999999,
+          "residual_pnl": -369.57,
+          "fees": 62.0,
+          "pair_edge_c": 9.59
+        },
+        "eth-15m": {
+          "markets": 192,
+          "traded": 192,
+          "pnl": 144.56,
+          "paired_shares": 5693.980000000001,
+          "residual_pnl": -346.85,
+          "fees": 65.73,
+          "pair_edge_c": 9.78
+        }
+      },
+      "risk_rejects": {
+        "residual_usd": 4062,
+        "rate_limit": 378,
+        "max_market_usd": 3,
+        "max_order_usd": 99
+      },
+      "postonly_or_venue_rejects": 43,
+      "data_gaps": 12,
+      "winners_inferred_from_spot": 0,
+      "daily_loss_halts": 0,
+      "killed": null,
+      "run_id": "bt-hold legs to expiry (no rescue/cut)-40122e",
+      "wall_s": 210.9,
+      "rows": 4950013
+    },
+    {
+      "label": "no maker fees (series without them)",
+      "unsettled_positions": {
+        "markets": 0,
+        "paired_shares": 0,
+        "residual_usd": 0,
+        "mtm_pnl": 0
+      },
+      "fee_profile": "kalshi_no_maker_fee",
+      "hours": 48.01,
+      "markets_seen": 384,
+      "markets_traded": 384,
+      "fills": 3736,
+      "maker_fills": 3363,
+      "taker_fills": 373,
+      "fills_per_hour": 77.8,
+      "shares_bought": 24506.6,
+      "avg_pair_cost": 0.9187,
+      "pair_edge_cents": 8.13,
+      "pair_edge_after_fees_cents": 7.97,
+      "paired_shares": 11439.7,
+      "capital_paired_usd": 10509.35,
+      "capital_residual_usd": 169.34,
+      "pct_capital_paired": 98.4,
+      "paired_pnl": 930.38,
+      "residual_pnl": -169.34,
+      "cut_pnl": -472.12,
+      "fees_paid": 19.09,
+      "maker_fees": 0.0,
+      "taker_fees": 19.09,
+      "fees_per_pair_cents": 0.17,
+      "maker_rebates_est": 0.0,
+      "net_pnl": 269.83,
+      "net_pnl_ex_rebates": 269.83,
+      "net_pnl_se": 57.06,
+      "max_drawdown": -26.59,
+      "pnl_per_traded_market_mean": 0.703,
+      "pnl_per_traded_market_stdev": 2.912,
+      "worst_market_pnl": -9.1,
+      "best_market_pnl": 8.95,
+      "legging": {
+        "episodes": 1666,
+        "pct_legs_completed": 87.3,
+        "pct_legs_over_30s": 43.6,
+        "pct_legs_over_60s": 32.3,
+        "pct_traded_markets_resolving_with_residual": 12.8,
+        "median_time_one_sided_s": 21.2,
+        "p90_time_one_sided_s": 523.5,
+        "closed_by": {
+          "passive": 1314,
+          "taker_complete": 141,
+          "cut": 160,
+          "resolution": 49,
+          "flip": 2
+        },
+        "residual_pnl_when_held": -169.34,
+        "residual_win_rate_pct": 0.0,
+        "rescue_excess_paid": 9.53,
+        "cost_of_legging": 650.99
+      },
+      "adverse_selection_cents": {
+        "10s": {
+          "mean": 0.72,
+          "pct_adverse": 41.7,
+          "n": 3363
+        },
+        "30s": {
+          "mean": 0.78,
+          "pct_adverse": 44.3,
+          "n": 3363
+        }
+      },
+      "by_bucket": {
+        "btc-15m": {
+          "markets": 192,
+          "traded": 192,
+          "pnl": 144.03,
+          "paired_shares": 5639.039999999998,
+          "residual_pnl": -83.63,
+          "fees": 9.54,
+          "pair_edge_c": 8.04
+        },
+        "eth-15m": {
+          "markets": 192,
+          "traded": 192,
+          "pnl": 125.81,
+          "paired_shares": 5800.690000000001,
+          "residual_pnl": -85.71,
+          "fees": 9.55,
+          "pair_edge_c": 8.22
+        }
+      },
+      "risk_rejects": {
+        "residual_usd": 3824,
+        "rate_limit": 513,
+        "max_order_usd": 260
+      },
+      "postonly_or_venue_rejects": 41,
+      "data_gaps": 12,
+      "winners_inferred_from_spot": 0,
+      "daily_loss_halts": 0,
+      "killed": null,
+      "run_id": "bt-no maker fees (series without them)-59365a",
+      "wall_s": 211.4,
+      "rows": 4950013
+    },
+    {
+      "label": "target pair cost 0.92",
+      "unsettled_positions": {
+        "markets": 0,
+        "paired_shares": 0,
+        "residual_usd": 0,
+        "mtm_pnl": 0
+      },
+      "fee_profile": "kalshi",
+      "hours": 48.01,
+      "markets_seen": 384,
+      "markets_traded": 376,
+      "fills": 2725,
+      "maker_fills": 2321,
+      "taker_fills": 404,
+      "fills_per_hour": 56.8,
+      "shares_bought": 18193.2,
+      "avg_pair_cost": 0.8831,
+      "pair_edge_cents": 11.69,
+      "pair_edge_after_fees_cents": 10.43,
+      "paired_shares": 8101.7,
+      "capital_paired_usd": 7154.34,
+      "capital_residual_usd": 191.16,
+      "pct_capital_paired": 97.4,
+      "paired_pnl": 947.41,
+      "residual_pnl": -191.16,
+      "cut_pnl": -539.16,
+      "fees_paid": 102.59,
+      "maker_fees": 83.86,
+      "taker_fees": 18.73,
+      "fees_per_pair_cents": 1.27,
+      "maker_rebates_est": 0.0,
+      "net_pnl": 114.5,
+      "net_pnl_ex_rebates": 114.5,
+      "net_pnl_se": 59.88,
+      "max_drawdown": -47.08,
+      "pnl_per_traded_market_mean": 0.305,
+      "pnl_per_traded_market_stdev": 3.088,
+      "worst_market_pnl": -6.06,
+      "best_market_pnl": 9.68,
+      "legging": {
+        "episodes": 1206,
+        "pct_legs_completed": 79.8,
+        "pct_legs_over_30s": 59.7,
+        "pct_legs_over_60s": 44.4,
+        "pct_traded_markets_resolving_with_residual": 15.2,
+        "median_time_one_sided_s": 47.0,
+        "p90_time_one_sided_s": 554.0,
+        "closed_by": {
+          "cut": 185,
+          "passive": 847,
+          "taker_complete": 115,
+          "resolution": 57,
+          "flip": 2
+        },
+        "residual_pnl_when_held": -191.16,
+        "residual_win_rate_pct": 0.0,
+        "rescue_excess_paid": 21.57,
+        "cost_of_legging": 751.89
+      },
+      "adverse_selection_cents": {
+        "10s": {
+          "mean": 0.76,
+          "pct_adverse": 39.6,
+          "n": 2321
+        },
+        "30s": {
+          "mean": 0.46,
+          "pct_adverse": 45.0,
+          "n": 2321
+        }
+      },
+      "by_bucket": {
+        "btc-15m": {
+          "markets": 192,
+          "traded": 188,
+          "pnl": 55.84,
+          "paired_shares": 3944.7699999999995,
+          "residual_pnl": -92.57,
+          "fees": 50.85,
+          "pair_edge_c": 12.17
+        },
+        "eth-15m": {
+          "markets": 192,
+          "traded": 188,
+          "pnl": 58.66,
+          "paired_shares": 4156.98,
+          "residual_pnl": -98.58,
+          "fees": 51.74,
+          "pair_edge_c": 11.24
+        }
+      },
+      "risk_rejects": {
+        "rate_limit": 440,
+        "residual_usd": 4338,
+        "max_market_usd": 1
+      },
+      "postonly_or_venue_rejects": 21,
+      "data_gaps": 12,
+      "winners_inferred_from_spot": 0,
+      "daily_loss_halts": 0,
+      "killed": null,
+      "run_id": "bt-target pair cost 0.92-f53ed5",
+      "wall_s": 218.2,
+      "rows": 4950013
+    },
+    {
+      "label": "target pair cost 0.96",
+      "unsettled_positions": {
+        "markets": 0,
+        "paired_shares": 0,
+        "residual_usd": 0,
+        "mtm_pnl": 0
+      },
+      "fee_profile": "kalshi",
+      "hours": 48.01,
+      "markets_seen": 384,
+      "markets_traded": 384,
+      "fills": 4087,
+      "maker_fills": 3744,
+      "taker_fills": 343,
+      "fills_per_hour": 85.1,
+      "shares_bought": 26196.6,
+      "avg_pair_cost": 0.9335,
+      "pair_edge_cents": 6.65,
+      "pair_edge_after_fees_cents": 5.48,
+      "paired_shares": 12479.7,
+      "capital_paired_usd": 11650.21,
+      "capital_residual_usd": 128.37,
+      "pct_capital_paired": 98.9,
+      "paired_pnl": 829.48,
+      "residual_pnl": -128.37,
+      "cut_pnl": -397.38,
+      "fees_paid": 146.15,
+      "maker_fees": 130.57,
+      "taker_fees": 15.58,
+      "fees_per_pair_cents": 1.17,
+      "maker_rebates_est": 0.0,
+      "net_pnl": 157.58,
+      "net_pnl_ex_rebates": 157.58,
+      "net_pnl_se": 51.52,
+      "max_drawdown": -27.58,
+      "pnl_per_traded_market_mean": 0.41,
+      "pnl_per_traded_market_stdev": 2.629,
+      "worst_market_pnl": -9.3,
+      "best_market_pnl": 7.07,
+      "legging": {
+        "episodes": 1801,
+        "pct_legs_completed": 89.7,
+        "pct_legs_over_30s": 37.6,
+        "pct_legs_over_60s": 28.0,
+        "pct_traded_markets_resolving_with_residual": 9.9,
+        "median_time_one_sided_s": 14.8,
+        "p90_time_one_sided_s": 425.8,
+        "closed_by": {
+          "taker_complete": 124,
+          "passive": 1492,
+          "resolution": 38,
+          "cut": 135,
+          "flip": 12
+        },
+        "residual_pnl_when_held": -128.37,
+        "residual_win_rate_pct": 0.0,
+        "rescue_excess_paid": 2.18,
+        "cost_of_legging": 527.92
+      },
+      "adverse_selection_cents": {
+        "10s": {
+          "mean": 0.97,
+          "pct_adverse": 40.0,
+          "n": 3744
+        },
+        "30s": {
+          "mean": 0.88,
+          "pct_adverse": 44.7,
+          "n": 3744
+        }
+      },
+      "by_bucket": {
+        "btc-15m": {
+          "markets": 192,
+          "traded": 192,
+          "pnl": 57.87,
+          "paired_shares": 6070.750000000002,
+          "residual_pnl": -72.58,
+          "fees": 71.64,
+          "pair_edge_c": 6.65
+        },
+        "eth-15m": {
+          "markets": 192,
+          "traded": 192,
+          "pnl": 99.71,
+          "paired_shares": 6408.939999999999,
+          "residual_pnl": -55.78,
+          "fees": 74.51,
+          "pair_edge_c": 6.64
+        }
+      },
+      "risk_rejects": {
+        "residual_usd": 1397,
+        "max_order_usd": 855,
+        "rate_limit": 66,
+        "residual_shares": 2
+      },
+      "postonly_or_venue_rejects": 42,
+      "data_gaps": 12,
+      "winners_inferred_from_spot": 0,
+      "daily_loss_halts": 0,
+      "killed": null,
+      "run_id": "bt-target pair cost 0.96-0b46d3",
+      "wall_s": 204.0,
+      "rows": 4950013
+    }
+  ]
+}

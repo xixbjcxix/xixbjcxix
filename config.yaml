@@ -1,0 +1,136 @@
+# Kalshi bot configuration. You rarely need to edit this file:
+#   * API keys:          python -m kbot setup        (writes .env + keys/, never this file)
+#   * everyday settings: the dashboard Settings panel (writes data/settings.yaml, which overrides this file)
+# Unknown keys are rejected on load, so typos fail loudly.
+
+db_path: data/kbot.db               # orders, fills, fees, PnL, risk events, quotes
+recording_db: data/recording.db     # raw recorded market data (stage 1)
+
+markets:
+  # which assets to trade. Must be keys of kalshi.series below, and Kalshi must actually have an
+  # open 15-minute series for them ("adding" a ticker here doesn't make Kalshi list it - `python -m
+  # kbot check` prints which series it finds markets under). btc, eth, sol are confirmed 15m Up/Down
+  # series as of writing; you can add more assets to kalshi.series/spot.index_ids below and list
+  # them here once Kalshi lists a matching series - or from the dashboard's Settings panel, which
+  # only lets you pick from the assets already configured here.
+  assets: [btc, eth]
+  data_env: prod                    # market data for `record` / `paper`: prod (real books, read-only) | demo
+
+kalshi:
+  # asset -> Kalshi series ticker. sol is included (KXSOL15M) even though `assets` above doesn't
+  # trade it by default - add "sol" to markets.assets to turn it on.
+  series: {btc: KXBTC15M, eth: KXETH15M, sol: KXSOL15M}   # 15-minute Up/Down series; `check` confirms they exist
+  prod_rest: https://external-api.kalshi.com/trade-api/v2
+  prod_ws: wss://external-api-ws.kalshi.com/trade-api/ws/v2
+  demo_rest: https://external-api.demo.kalshi.co/trade-api/v2
+  demo_ws: wss://external-api-ws.demo.kalshi.co/trade-api/ws/v2
+  demo_key_id_env: KALSHI_DEMO_KEY_ID      # names of the .env variables (values set by `setup`)
+  demo_key_path_env: KALSHI_DEMO_KEY_PATH
+  prod_key_id_env: KALSHI_PROD_KEY_ID
+  prod_key_path_env: KALSHI_PROD_KEY_PATH
+  write_tokens_per_s: 100           # Basic tier budget; `check` prints your tier
+  read_tokens_per_s: 200
+  order_cost_tokens: 10
+  cancel_cost_tokens: 2
+  poll_book_ms: 1000                # REST polling fallback when you have no keys for the data environment
+  lookahead_windows: 1
+  discovery_interval_s: 15
+  max_position_contracts: 25000     # guard below Kalshi's per-market position limit
+
+spot:
+  source: kalshi_index              # kalshi_index (CF Benchmarks, the settlement source) | coinbase | kraken
+  fallback: coinbase                # used if the index isn't streaming (e.g. no keys)
+  # CF Benchmarks Real-Time Index id per asset (the actual settlement source for that market).
+  index_ids: {btc: BRTI, eth: ETHUSD_RTI, sol: SOLUSD_RTI}
+  coinbase_ws_url: wss://ws-feed.exchange.coinbase.com
+  kraken_ws_url: wss://ws.kraken.com/v2
+
+strategy:
+  target_pair_cost: 0.94            # YES + NO per set, INCLUDING fees
+  clip_shares: 10                   # contracts per resting order
+  improve_ticks: 1                  # never bid more than this many ticks above the best bid
+  min_price: 0.05
+  max_price: 0.90
+  start_offset_s: 0
+  cutoff_s: {900: 60}               # HARD STOP: no orders in the final 60 s (the settlement averaging minute)
+  rescue_window_s: 90               # before cutoff: raise completion limit when residual isn't allowed
+  flatten_s: 30                     # before cutoff: taker-exit residual that isn't allowed
+  rescue_pair_cost: 0.99            # all-in completion limit when rescuing
+  max_exit_pair_cost: 1.03
+  taker_complete: true              # take the other side when the all-in pair cost stays <= target
+  taker_entry: false
+  taker_entry_pair_cost: 0.92
+  no_new_legs_in_rescue: true
+  residual:
+    enabled: true                   # keep an unpaired leg only while the signal agrees
+    max_shares: 20
+    max_usd: 8
+    ride_when_agreeing: true
+
+signal:
+  lookback_s: 30                    # momentum window
+  min_momentum_bps: 2
+  min_z: 0.6                        # distance from target in volatility units
+  vol_lookback_s: 900
+  sigma_floor_per_sqrt_s: 0.00003
+  spot_stale_ms: 5000
+
+risk:
+  max_order_usd: 10
+  max_market_usd: 40
+  max_residual_usd: 10
+  max_residual_shares: 25
+  max_total_usd: 150
+  max_daily_loss_usd: 25            # halts new orders until the next UTC day
+  max_open_orders: 40
+  max_orders_per_min: 300
+  pm_stale_ms: 20000                # no Kalshi market data for this long = data gap -> cancel all
+  kill_file: data/KILL              # `touch data/KILL` trips the kill switch (sticky until restart)
+
+fill_model:                         # simulator (backtest, paper, replay)
+  order_latency_ms: 150
+  cancel_latency_ms: 150
+  taker_delay_ms: 50
+  queue_mode: pessimistic
+  fill_on_cross: true
+  complement_trades: false
+
+fees:
+  profile: kalshi                   # kalshi | kalshi_no_maker_fee | zero
+  precision: 0.01                   # per-fill fee rounded UP to this; 0.0001 if you are a direct member
+  default_fee_type: quadratic_with_maker_fees
+  use_market_schedule: true         # read fee_type / fee_multiplier from each series
+  rebate_capture: 1.0
+
+engine:
+  min_tick_ms: 250
+  timer_ms: 250
+  requote_up_ticks: 2
+  requote_stale_ms: 5000
+  reject_backoff_ms: 2000
+
+backtest:
+  settle_delay_ms: 5000
+  infer_winner_from_spot: true
+
+dashboard:
+  enabled: true
+  host: 127.0.0.1
+  port: 8787                        # if busy, the next free port is used (printed at start)
+  open_browser: true
+
+live:                               # REAL MONEY mode: `kbot live --i-understand-real-money`
+  enabled: true                     # false = refuse to start live mode at all
+  use_starter_limits: true          # small limits below override `risk`/`clip` in live mode; set false to use your own
+  smoke_test: true                  # place + cancel one 1-cent test order before trading
+  clip_shares: 5
+  max_order_usd: 5
+  max_market_usd: 20
+  max_residual_usd: 5
+  max_residual_shares: 10
+  max_total_usd: 60
+  max_daily_loss_usd: 15
+
+store_tob: true
+store_our_quotes: true
+record_raw_in_paper: true
