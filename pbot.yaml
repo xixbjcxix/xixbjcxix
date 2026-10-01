@@ -1,9 +1,9 @@
 # pbot - opening-window day-trading agent for Public.com.  Secrets live in .env (python -m pbot setup).
 # Every key is optional; defaults are in pbot/config.py.
 
-# Liquid names whose price fits your max_position_usd. Re-check prices: a $400 stock cannot be
-# bought with a $150 position cap in whole shares (either raise the cap or set fractional: true).
-watchlist: [SOFI, PLTR, AMD, F, INTC, HOOD, RIVN, NIO, AAL, MARA]
+# Liquid names whose price fits the current level's max_position_usd. At 'micro' that is $60, so
+# stick to stocks under ~$30 (2+ whole shares). Re-check prices before you start - they move.
+watchlist: [F, SOFI, NIO, AAL, INTC, RIVN, SNAP, LCID]
 
 session:
   opening_range_minutes: 5     # 09:30-09:35 ET defines the range
@@ -23,7 +23,19 @@ strategy:
   max_spread_pct: 0.15
   min_range_volume: 50000
 
-risk:                          # small by design - start here and only scale after weeks of paper results
+# Start small and build: the size ladder sets risk_per_trade_usd, max_position_usd,
+# max_open_positions, max_trades_per_day and max_daily_loss_usd from the current level
+# (micro -> small -> medium -> standard), overriding those keys under `risk:` below.
+# `python -m pbot progress` shows where you are and what is needed to move up.
+ladder:
+  enabled: true
+  promote_min_trades: 20       # at the current level...
+  promote_min_days: 10         # ...over at least this many sessions
+  promote_min_profit_factor: 1.2
+  demote_drawdown_r: 6         # auto drop a level after a 6 x risk drawdown
+  # levels: [...]              # defaults in pbot/config.py; copy them here to customise
+
+risk:                          # used as-is only if ladder.enabled is false
   risk_per_trade_usd: 5
   max_position_usd: 150
   max_open_positions: 2

@@ -21,6 +21,7 @@ import httpx
 from .clock import MarketCalendar
 from .config import BotConfig
 from .journal import Journal
+from .ladder import Ladder
 from .public_api import Bar, Quote
 from .risk import RiskManager
 from .strategy import OpeningRange, Position, evaluate_long, manage, opening_range, screen_range
@@ -41,6 +42,7 @@ class Agent:
         self.risk = RiskManager(cfg.risk, journal, self.cal, mode)
         self.alert_url = alert_url
         self.kill_file = os.path.join(cfg.data_dir, "STOP")
+        self.ladder = Ladder(cfg.ladder, journal) if cfg.ladder.enabled else None
         self._reset_day()
 
     # ---- bookkeeping ------------------------------------------------------------------------
@@ -82,6 +84,15 @@ class Agent:
             self.say(f"{d} is not a trading day - nothing to do")
             return None
         self._reset_day()
+        if self.ladder:
+            demoted = self.ladder.check_demotion(self.mode, now)
+            if demoted:
+                self.say(demoted, "WARNING", alert=True)
+            level = self.ladder.apply(self.cfg, self.mode, now)
+            r = self.cfg.risk
+            self.say(f"size level {level} '{self.ladder.name(level)}': risk ${r.risk_per_trade_usd:g}/trade, "
+                     f"max position ${r.max_position_usd:g}, {r.max_open_positions} open, "
+                     f"{r.max_trades_per_day} trades/day, daily loss cap ${r.max_daily_loss_usd:g}")
         t_open, t_range = self.cal.open_time(d), self.cal.range_end(d)
         t_cut, t_flat = self.cal.entry_cutoff(d), self.cal.flatten_time(d)
 

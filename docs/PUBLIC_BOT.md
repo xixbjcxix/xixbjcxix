@@ -37,6 +37,44 @@ The result is rounded down to whole shares.
 its own stop. If your computer or the bot dies, the position is still protected. The bot cancels
 that order before it exits normally.
 
+## Start small and build: the size ladder
+
+Every account starts at **micro** and has to earn each step up. Paper and live each have their
+own level.
+
+| Level        | Risk/trade | Max position | Open | Trades/day | Daily loss cap |
+|--------------|-----------:|-------------:|-----:|-----------:|---------------:|
+| 0 `micro`    |        $2  |         $60  |    1 |          2 |            $6  |
+| 1 `small`    |        $5  |        $150  |    2 |          4 |           $15  |
+| 2 `medium`   |       $10  |        $300  |    2 |          4 |           $30  |
+| 3 `standard` |       $20  |        $600  |    3 |          5 |           $60  |
+
+* **Moving up is manual and has to be earned.** `python -m pbot promote` only works once the
+  record *at the current level* shows all of these:
+  * at least 20 closed trades;
+  * at least 10 sessions;
+  * a net profit;
+  * a profit factor of at least 1.2 (gross wins ÷ gross losses);
+  * a drawdown under half the demotion line.
+
+  After a promotion the record starts again from zero.
+* **Moving down is automatic.** Losing 6× the level's risk per trade from the peak drops the
+  account one level at the next pre-flight.
+* **Live has to be earned on paper.** `live` refuses to start until the paper record has passed
+  the micro criteria.
+* Run `python -m pbot progress` to see the current level, the record and the checklist.
+
+The plan:
+
+1. **Weeks 1+:** run `paper` at micro until `progress` shows every box ticked.
+2. **First live session:** start `live` at micro. You risk $2 per trade and at most $6 per day.
+3. **Earning the next level:** after 20+ live trades with a passing checklist, run
+   `promote --mode live` to move to small. Repeat for each level.
+
+Under the PDT guard (3 day trades per 5 sessions) it takes about 6–7 weeks to collect 20 trades.
+That is slow, but it is real evidence. If Public confirms the PDT limit no longer applies to you,
+set `risk.pdt_guard: false` and it goes faster.
+
 ## Setup
 
 You need Python 3.10+ and a Public brokerage account with API access.
@@ -59,6 +97,7 @@ Never paste the secret key into a chat, email or ticket.
 ./pbot.sh sim --days 10     # offline: synthetic market, fast clock, no key needed
 ./pbot.sh paper             # REAL Public quotes, SIMULATED fills (no orders sent), every trading day
 ./pbot.sh report            # today's trades;  --all for everything, --mode live for live
+./pbot.sh progress          # size level + what's left before you can move up
 ```
 
 To go live, set `live: {enabled: true}` in `pbot.yaml`, then run:
@@ -78,8 +117,8 @@ in `.env` to a Slack or Discord webhook to get entries, exits and halts on your 
 * **`watchlist`:** liquid names whose price fits `max_position_usd`. A $400 stock cannot be bought
   in whole shares under a $150 cap. Raise the cap or set `execution.fractional: true`. Check
   first that Public accepts fractional orders through the API for that symbol.
-* **`risk.*`:** start tiny. Scale `risk_per_trade_usd` only after weeks of results. Keep
-  `max_daily_loss_usd` at about 3× the risk per trade.
+* **`ladder.*`:** sets the level sizes and promotion rules. While the ladder is on, the per-level
+  limits replace the matching `risk.*` keys.
 * **`strategy.*`:** range filters, VWAP requirement, stop placement (`mid` or `low`), target and
   breakeven multiples.
 * **`session.*`:** window times and the holiday calendar. Add next year's NYSE holidays when they
@@ -113,6 +152,7 @@ in `.env` to a Slack or Discord webhook to get entries, exits and halts on your 
 pbot/public_api.py   Public REST client (token auth, retries, quotes, bars, orders)
 pbot/strategy.py     opening range, VWAP, entry/exit rules (pure functions)
 pbot/risk.py         sizing, daily loss, trade caps, PDT guard
+pbot/ladder.py       start-small size ladder (earned promotion, automatic demotion)
 pbot/broker.py       live broker, paper broker, synthetic market
 pbot/agent.py        the daily loop
 pbot/journal.py      SQLite journal (data/pbot.db) + reports

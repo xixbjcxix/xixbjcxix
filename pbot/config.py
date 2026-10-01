@@ -86,6 +86,26 @@ class PaperConfig:
 
 
 @dataclass
+class LadderConfig:
+    enabled: bool = True
+    # Each level overrides these risk.* keys. Everyone starts at level 0; see pbot/ladder.py.
+    levels: List[Dict[str, Any]] = field(default_factory=lambda: [
+        {"name": "micro", "risk_per_trade_usd": 2, "max_position_usd": 60, "max_open_positions": 1,
+         "max_trades_per_day": 2, "max_daily_loss_usd": 6},
+        {"name": "small", "risk_per_trade_usd": 5, "max_position_usd": 150, "max_open_positions": 2,
+         "max_trades_per_day": 4, "max_daily_loss_usd": 15},
+        {"name": "medium", "risk_per_trade_usd": 10, "max_position_usd": 300, "max_open_positions": 2,
+         "max_trades_per_day": 4, "max_daily_loss_usd": 30},
+        {"name": "standard", "risk_per_trade_usd": 20, "max_position_usd": 600, "max_open_positions": 3,
+         "max_trades_per_day": 5, "max_daily_loss_usd": 60},
+    ])
+    promote_min_trades: int = 20
+    promote_min_days: int = 10
+    promote_min_profit_factor: float = 1.2       # gross wins / gross losses
+    demote_drawdown_r: float = 6.0               # drop a level after losing 6 x risk-per-trade from the peak
+
+
+@dataclass
 class LiveConfig:
     enabled: bool = False                        # second gate besides the typed confirmation
 
@@ -101,6 +121,7 @@ class BotConfig:
     execution: ExecutionConfig = field(default_factory=ExecutionConfig)
     paper: PaperConfig = field(default_factory=PaperConfig)
     live: LiveConfig = field(default_factory=LiveConfig)
+    ladder: LadderConfig = field(default_factory=LadderConfig)
     data_dir: str = "data"
     alert_webhook_env: str = "PBOT_ALERT_WEBHOOK"
 
@@ -123,6 +144,14 @@ def load_config(path: str = "pbot.yaml") -> BotConfig:
         with open(path, "r", encoding="utf-8") as f:
             _merge(cfg, yaml.safe_load(f) or {})
     cfg.watchlist = [s.strip().upper() for s in cfg.watchlist if s and s.strip()]
+    if not cfg.ladder.levels:
+        raise ValueError("ladder.levels must have at least one level")
+    for lv in cfg.ladder.levels:
+        for k in lv:
+            if k != "name" and not hasattr(cfg.risk, k):
+                raise ValueError(f"ladder level {lv.get('name')}: unknown risk key {k}")
+        if "risk_per_trade_usd" not in lv:
+            raise ValueError(f"ladder level {lv.get('name')}: risk_per_trade_usd is required")
     return cfg
 
 

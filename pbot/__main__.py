@@ -6,6 +6,9 @@
   paper    REAL market data from Public, SIMULATED fills (no orders sent)
   live     REAL-MONEY orders (needs live.enabled: true in pbot.yaml + typed START, or --yes)
   report   trade journal summary (today or --all)
+  progress size level (micro -> small -> ...) and what is still needed to move up
+  promote  move up one size level - only if the record at the current level qualifies
+  demote   move down one size level
   flatten  sell positions the bot opened (live) and cancel their open orders
 """
 from __future__ import annotations
@@ -187,9 +190,49 @@ def cmd_paper(cfg: BotConfig, args) -> int:
     return _run_real(cfg, args, "paper")
 
 
+def _ladder(cfg: BotConfig, mode: str):
+    from .ladder import Ladder
+    from .journal import Journal
+    path = os.path.join(cfg.data_dir, "pbot-sim.db" if mode == "sim" else "pbot.db")
+    return Ladder(cfg.ladder, Journal(path))
+
+
+def _now(cfg: BotConfig) -> datetime:
+    return SystemClock(MarketCalendar(cfg.session).tz).now()
+
+
+def cmd_progress(cfg: BotConfig, args) -> int:
+    modes = [args.mode] if args.mode else ["paper", "live"]
+    for m in modes:
+        print(_ladder(cfg, m).progress_text(m, _now(cfg)))
+        print()
+    return 0
+
+
+def cmd_promote(cfg: BotConfig, args) -> int:
+    ok, msg = _ladder(cfg, args.mode).promote(args.mode, _now(cfg), force=args.force)
+    print(msg)
+    return 0 if ok else 1
+
+
+def cmd_demote(cfg: BotConfig, args) -> int:
+    print(_ladder(cfg, args.mode).demote(args.mode, _now(cfg)))
+    return 0
+
+
 def cmd_live(cfg: BotConfig, args) -> int:
     if not cfg.live.enabled:
         sys.exit("Live trading is off. Paper trade first, then set `live: {enabled: true}` in pbot.yaml.")
+    if cfg.ladder.enabled:
+        lad = _ladder(cfg, "live")
+        ready, checks = lad.paper_ready_for_live(_now(cfg))
+        if not ready and not args.skip_paper_check:
+            print("Paper record has not earned live trading yet (level-0 criteria):")
+            for t, good in checks:
+                print(f"  [{'x' if good else ' '}] {t}")
+            print("Keep running `python -m pbot paper`. (Override: --skip-paper-check)")
+            return 1
+        lad.apply(cfg, "live", _now(cfg))
     r = cfg.risk
     print("=" * 72)
     print("REAL MONEY. This bot will place real orders on your Public account.")
@@ -268,18 +311,28 @@ def main(argv=None) -> int:
         s.add_argument("--once", action="store_true", help="trade one session then exit (default: every day)")
         if name == "live":
             s.add_argument("--yes", action="store_true", help="skip the typed START (for schedulers)")
+            s.add_argument("--skip-paper-check", action="store_true",
+                           help="go live before the paper record qualifies (not recommended)")
     s = sub.add_parser("report", help="journal summary")
     s.add_argument("--mode", default="paper", choices=["paper", "live", "sim"])
     s.add_argument("--date")
     s.add_argument("--all", action="store_true")
     sub.add_parser("flatten", help="sell the bot's open live positions now")
+    s = sub.add_parser("progress", help="size level and promotion checklist")
+    s.add_argument("--mode", choices=["paper", "live", "sim"])
+    for name, h in (("promote", "move up one size level (if earned)"), ("demote", "move down one size level")):
+        s = sub.add_parser(name, help=h)
+        s.add_argument("--mode", default="paper", choices=["paper", "live", "sim"])
+        if name == "promote":
+            s.add_argument("--force", action="store_true", help="promote even if the criteria are not met")
     args = p.parse_args(argv)
 
     _load_env()
     cfg = load_config(args.config)
     _setup_logging(cfg, args.verbose)
     return {"setup": cmd_setup, "check": cmd_check, "sim": cmd_sim, "paper": cmd_paper,
-            "live": cmd_live, "report": cmd_report, "flatten": cmd_flatten}[args.cmd](cfg, args)
+            "live": cmd_live, "report": cmd_report, "flatten": cmd_flatten, "progress": cmd_progress,
+            "promote": cmd_promote, "demote": cmd_demote}[args.cmd](cfg, args)
 
 
 if __name__ == "__main__":

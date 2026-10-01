@@ -15,6 +15,7 @@ from pbot.broker import LiveBroker, PaperBroker, make_sim  # noqa: E402
 from pbot.clock import MarketCalendar, SimClock  # noqa: E402
 from pbot.config import BotConfig, ExecutionConfig, RiskConfig, StrategyConfig, load_config, with_overrides  # noqa: E402
 from pbot.journal import Journal  # noqa: E402
+from pbot.ladder import Ladder  # noqa: E402
 from pbot.public_api import Bar, OrderState, PublicClient, Quote  # noqa: E402
 from pbot.risk import RiskManager  # noqa: E402
 from pbot.strategy import Position, evaluate_long, manage, opening_range, screen_range, vwap  # noqa: E402
@@ -321,6 +322,75 @@ class AgentTests(unittest.TestCase):
                   {"orderId": "users", "instrument": {"symbol": "AAPL"}, "status": "NEW"}]
         client.portfolio = lambda: {"orders": orders}
         self.assertEqual(b.open_order_ids(["SOFI"]), ["mine"])
+
+
+class LadderTests(unittest.TestCase):
+    def setUp(self):
+        self.cfg = BotConfig()
+        self.j = Journal(":memory:")
+        self.lad = Ladder(self.cfg.ladder, self.j)
+        self.tz = MarketCalendar(self.cfg.session).tz
+        self.t0 = datetime(2026, 9, 1, 9, 0, tzinfo=self.tz)
+
+    def trade(self, day_offset, pnl, mode="paper"):
+        ts = self.t0 + timedelta(days=day_offset, hours=1)
+        t = self.j.open_trade(mode, ts, "F", 10, 10.0, 9.8, 10.4, "t")
+        self.j.close_trade(t, ts + timedelta(minutes=10), 10.0 + pnl / 10, "x")
+
+    def test_starts_micro_and_applies_limits(self):
+        cfg = BotConfig()
+        self.assertEqual(self.lad.apply(cfg, "paper", self.t0), 0)
+        self.assertEqual((cfg.risk.risk_per_trade_usd, cfg.risk.max_open_positions), (2, 1))
+
+    def test_promotion_must_be_earned(self):
+        self.lad.state("paper", self.t0)
+        ok, msg = self.lad.promote("paper", self.t0 + timedelta(days=1))
+        self.assertFalse(ok)
+        self.assertIn("not yet", msg)
+        for i in range(24):                       # 24 trades over 12 days, 2:1 winners
+            self.trade(i // 2, 2.0 if i % 3 else -2.0)
+        ok, msg = self.lad.promote("paper", self.t0 + timedelta(days=13))
+        self.assertTrue(ok, msg)
+        self.assertEqual(self.lad.state("paper", self.t0)[0], 1)
+        cfg = BotConfig()
+        self.lad.apply(cfg, "paper", self.t0)
+        self.assertEqual(cfg.risk.risk_per_trade_usd, 5)
+        # The record restarts at the new level.
+        ok, _ = self.lad.promote("paper", self.t0 + timedelta(days=13, minutes=1))
+        self.assertFalse(ok)
+
+    def test_losing_record_cannot_promote_and_force_works(self):
+        self.lad.state("paper", self.t0)
+        for i in range(24):
+            self.trade(i // 2, -1.0 if i % 3 else 1.0)
+        ok, msg = self.lad.promote("paper", self.t0 + timedelta(days=13))
+        self.assertFalse(ok)
+        self.assertIn("net P&L", msg)
+        ok, _ = self.lad.promote("paper", self.t0 + timedelta(days=13), force=True)
+        self.assertTrue(ok)
+
+    def test_auto_demotion_on_drawdown(self):
+        self.lad._set("live", 1, self.t0, "test")              # 'small': risk $5 -> demote at -$30
+        for i in range(6):
+            self.trade(i, -5.5, mode="live")
+        msg = self.lad.check_demotion("live", self.t0 + timedelta(days=7))
+        self.assertIn("demoted", msg)
+        self.assertEqual(self.lad.state("live", self.t0)[0], 0)
+        self.assertIsNone(self.lad.check_demotion("live", self.t0 + timedelta(days=7)))   # floor
+
+    def test_live_needs_paper_record(self):
+        ready, _ = self.lad.paper_ready_for_live(self.t0)
+        self.assertFalse(ready)
+        self.lad._set("paper", 1, self.t0, "test")
+        ready, _ = self.lad.paper_ready_for_live(self.t0)
+        self.assertTrue(ready)
+
+    def test_bad_level_key_rejected(self):
+        path = os.path.join(tempfile.mkdtemp(), "c.yaml")
+        with open(path, "w") as f:
+            f.write("ladder:\n  levels:\n    - {name: x, risk_per_trade_usd: 1, bogus: 2}\n")
+        with self.assertRaises(ValueError):
+            load_config(path)
 
 
 if __name__ == "__main__":

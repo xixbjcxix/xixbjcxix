@@ -1,7 +1,7 @@
 # Kalshi 15-minute crypto bot (BTC / ETH / SOL Up or Down)
 
 > **Also in this repo: `pbot`**, an opening-window stock day-trading agent for **Public.com**
-> (paper and live). See [`docs/PUBLIC_BOT.md`](docs/PUBLIC_BOT.md). Quick start: `./pbot.sh setup`, then `./pbot.sh paper`.
+> (paper and live). See [`docs/PUBLIC_BOT.md`](docs/PUBLIC_BOT.md). Quick start: `./pbot.sh setup`, then `./pbot.sh paper`; it starts at $2/trade and sizes up as it earns it.
 
 Complete-set accumulation with a gated directional residual, for Kalshi's 15-minute
 "Up or Down" series (`KXBTC15M`, `KXETH15M`, `KXSOL15M`).
