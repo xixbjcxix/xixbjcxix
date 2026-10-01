@@ -1,0 +1,48 @@
+# pbot - opening-window day-trading agent for Public.com.  Secrets live in .env (python -m pbot setup).
+# Every key is optional; defaults are in pbot/config.py.
+
+# Liquid names whose price fits your max_position_usd. Re-check prices: a $400 stock cannot be
+# bought with a $150 position cap in whole shares (either raise the cap or set fractional: true).
+watchlist: [SOFI, PLTR, AMD, F, INTC, HOOD, RIVN, NIO, AAL, MARA]
+
+session:
+  opening_range_minutes: 5     # 09:30-09:35 ET defines the range
+  entry_cutoff: "10:30"        # no new trades after this
+  flatten_at: "11:00"          # everything closed by this time, every day
+  poll_seconds: 2
+
+strategy:
+  breakout_buffer_pct: 0.05    # must clear the range high by 0.05%
+  min_range_pct: 0.25
+  max_range_pct: 3.0
+  require_above_vwap: true
+  stop_mode: mid               # mid | low
+  target_r: 2.0                # take profit at 2x risk
+  breakeven_at_r: 1.0          # stop -> entry once up 1x risk
+  max_chase_range_frac: 0.5    # skip if already > half a range above the high
+  max_spread_pct: 0.15
+  min_range_volume: 50000
+
+risk:                          # small by design - start here and only scale after weeks of paper results
+  risk_per_trade_usd: 5
+  max_position_usd: 150
+  max_open_positions: 2
+  max_trades_per_day: 4
+  max_daily_loss_usd: 15
+  max_buying_power_frac: 0.5
+  use_cash_only_buying_power: true
+  pdt_guard: true              # see the note in pbot/config.py about the 2026 PDT repeal
+
+execution:
+  entry_slippage_pct: 0.05     # marketable limit: ask + 0.05%
+  exit_slippage_pct: 0.10      # bid - 0.10%, then market for anything unfilled
+  order_timeout_s: 8
+  broker_stop: true            # resting STOP at Public in case this computer/bot dies
+  broker_stop_extra_r: 0.5
+  fractional: false
+
+paper:
+  starting_cash: 1000
+
+live:
+  enabled: false               # flip to true only after paper trading
