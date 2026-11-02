@@ -181,6 +181,7 @@ class KalshiClient:
         self.session: aiohttp.ClientSession | None = None
         self.reads = _Bucket(8)
         self.writes = _Bucket(4)
+        self.n_429 = 0
 
     @property
     def authed(self) -> bool:
@@ -219,18 +220,28 @@ class KalshiClient:
 
     async def _req(self, method: str, path: str, params: dict | None = None,
                    body: dict | None = None, auth: bool = False) -> dict:
+        """One request.  On 429 (rate limited) or a 5xx on a read, wait and retry.
+        New orders (POST) are never retried: the strategy re-decides next tick."""
         if self.session is None:
             self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10), trust_env=True)
-        await (self.writes if method in ("POST", "DELETE") else self.reads).take()
-        headers = self._headers(method, path) if (auth or self.authed) else {}
-        if body is not None:
-            headers["Content-Type"] = "application/json"
-        async with self.session.request(method, self.base_url + path, params=params,
-                                        json=body, headers=headers) as r:
-            text = await r.text()
-            if r.status >= 400:
-                raise KalshiError(r.status, text, path)
-            return await r.json(content_type=None) if text else {}
+        retries = 0 if method == "POST" else 4
+        for attempt in range(retries + 1):
+            await (self.writes if method in ("POST", "DELETE") else self.reads).take()
+            headers = self._headers(method, path) if (auth or self.authed) else {}
+            if body is not None:
+                headers["Content-Type"] = "application/json"
+            async with self.session.request(method, self.base_url + path, params=params,
+                                            json=body, headers=headers) as r:
+                text = await r.text()
+                retry = r.status == 429 or (r.status >= 500 and method == "GET")
+                if retry and attempt < retries:
+                    self.n_429 += r.status == 429
+                    await asyncio.sleep(min(4.0, 0.3 * 2 ** attempt))
+                    continue
+                if r.status >= 400:
+                    raise KalshiError(r.status, text, path)
+                return await r.json(content_type=None) if text else {}
+        raise KalshiError(429, "rate limited after retries", path)
 
     # ---- market data (public)
     async def markets(self, series: str, status: str | None = None, limit: int = 50) -> list[dict]:

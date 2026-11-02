@@ -94,3 +94,42 @@ def test_shard_balances_parse():
     c._req = req
     assert asyncio.run(c.balances()) == {0: 39.27, 2: 33.68}
     assert asyncio.run(c.balance(2)) == 33.68
+
+
+def test_retries_after_429(monkeypatch):
+    import adaptbot.kalshi as k
+    calls = []
+
+    class Resp:
+        def __init__(self, status, text):
+            self.status, self._t = status, text
+
+        async def text(self):
+            return self._t
+
+        async def json(self, content_type=None):
+            import json
+            return json.loads(self._t)
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+    class Sess:
+        def request(self, method, url, **kw):
+            calls.append(method)
+            return Resp(429, "{}") if len(calls) < 3 else Resp(200, '{"balance": 100}')
+
+    async def nosleep(_):
+        return None
+    monkeypatch.setattr(k.asyncio, "sleep", nosleep)
+    c = KalshiClient("https://x/trade-api/v2")
+    c.session = Sess()
+    assert asyncio.run(c.balances()) == {0: 1.0}
+    assert len(calls) == 3
+    calls.clear()
+    with pytest.raises(KalshiError):
+        asyncio.run(c._req("POST", "/portfolio/events/orders", body={}))   # orders never retried
+    assert len(calls) == 1
