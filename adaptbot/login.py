@@ -70,13 +70,29 @@ def _load_pem(text: str):
 
 
 def find_kbot_env() -> str | None:
-    """Look for an old kbot install (its .env holds KALSHI_PROD_KEY_ID / _PATH)."""
+    """Look for an old kbot install: a .env with KALSHI_PROD_KEY_ID in this folder,
+    its parent, any folder next to it, or ~/kbot, ~/Desktop/*, ~/Downloads/*."""
     here = os.path.abspath(".")
-    cands = [os.path.join(here, ".env"), os.path.join(here, "..", "kbot", ".env"),
-             os.path.join(here, "..", ".env"), os.path.join(os.path.expanduser("~"), "kbot", ".env")]
-    for c in cands:
-        if os.path.exists(c):
-            return os.path.abspath(c)
+    parent = os.path.dirname(here)
+    home = os.path.expanduser("~")
+    cands = [here, parent, os.path.join(home, "kbot")]
+    for base in (parent, os.path.join(home, "Desktop"), os.path.join(home, "Downloads"), home):
+        try:
+            cands += [os.path.join(base, d) for d in sorted(os.listdir(base))]
+        except OSError:
+            pass
+    seen = set()
+    for d in cands:
+        c = os.path.join(d, ".env")
+        if c in seen:
+            continue
+        seen.add(c)
+        try:
+            if os.path.isfile(c) and "KALSHI_PROD_KEY_ID" in open(c, encoding="utf-8", errors="ignore").read():
+                if read_kbot_key(c):
+                    return os.path.abspath(c)
+        except OSError:
+            pass
     return None
 
 

@@ -70,6 +70,23 @@ def client_for(s, need_auth: bool) -> KalshiClient:
     return KalshiClient(s.base_url, kid, kpath, s.time_in_force)
 
 
+def do_login(browser: bool = False) -> None:
+    """Desktop window first; browser page if this Python has no tkinter."""
+    if not browser:
+        try:
+            from .login_window import run_window
+            print("Opening the login window...")
+            if run_window():
+                print("Kalshi key saved. Next: Check (2).")
+            return
+        except ImportError:
+            print("This Python has no window toolkit (tkinter) - using a browser page instead.")
+        except Exception as e:  # noqa: BLE001 - e.g. no display
+            print(f"Could not open a window ({e!r}) - using a browser page instead.")
+    from .login import run_login
+    asyncio.run(run_login())
+
+
 def do_setup() -> None:
     print("Create an API key on kalshi.com (Account -> API keys) and download the private key file.")
     kid = input("API key id: ").strip()
@@ -244,8 +261,7 @@ def main(argv: list[str]) -> None:
                "6": "synthetic", "7": "record"}.get(input("Choose 1-8: ").strip(), "quit")
     try:
         if cmd == "login":
-            from .login import run_login
-            asyncio.run(run_login())
+            do_login("--browser" in argv)
         elif cmd == "setup":            # text-only fallback
             do_setup()
         elif cmd == "check":

@@ -37,7 +37,7 @@ To test an idea, from Grok or from you, add it as a profile in `data/settings.ya
 
 ## Use
 
-Windows: double-click `start.bat`. It creates a Python environment on first run and opens the menu.
+Windows: double-click `login.bat` once to connect your Kalshi key (a window opens), then `start.bat`. It creates a Python environment on first run and opens the menu.
 Elsewhere: `pip install -r requirements.txt` then `python -m adaptbot`.
 
 ```
