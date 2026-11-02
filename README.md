@@ -41,12 +41,13 @@ Windows: double-click `start.bat`. It creates a Python environment on first run 
 Elsewhere: `pip install -r requirements.txt` then `python -m adaptbot`.
 
 ```
-1 Setup (API keys)     2 Check keys / markets / price feeds
+1 Login (window)       2 Check keys / markets / price feeds
 3 PAPER + dashboard    4 LIVE + dashboard
 5 Backtest recordings  6 Backtest synthetic (plumbing test)   7 Record only
 ```
 
 Recommended path:
+0. **Login (1):** a window opens in your browser. Click *Use my kbot key* if it finds your old kbot install, or enter the key ID and choose the private-key file. **Test connection** shows your cash on each exchange shard. The key never leaves your PC.
 1. **Check (2):** confirms keys, markets, order book and all three price feeds.
 2. **PAPER (3) for at least a day.** It records every tick to `data/recordings/`, and the dashboard (http://127.0.0.1:8787) shows each profile's head-to-head results.
 3. **Backtest (5):** `python -m adaptbot backtest --seed` replays your recordings. `--seed` saves the learning state so live trading starts warmed up.

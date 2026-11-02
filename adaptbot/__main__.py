@@ -1,7 +1,8 @@
 """Menu and command line.
 
     python -m adaptbot                 menu
-    python -m adaptbot paper|live|record|check
+    python -m adaptbot login                       connect your Kalshi key (browser window)
+    python -m adaptbot paper|live|record|check|setup
     python -m adaptbot backtest [files...]            replay recordings
     python -m adaptbot backtest --synthetic [N] [--no-edge]
     python -m adaptbot backtest ... --seed            also save the learning state
@@ -27,7 +28,7 @@ from .spot import SpotHub
 MENU = """
 adaptbot - adaptive Kalshi 15-minute bot
 ----------------------------------------
-  1  Setup (enter API keys)
+  1  Login - connect your Kalshi API key (opens a window)
   2  Check keys, markets and price feeds
   3  PAPER trading (real data, simulated fills) + dashboard
   4  LIVE trading - REAL MONEY + dashboard
@@ -63,7 +64,7 @@ def ensure_settings():
 def client_for(s, need_auth: bool) -> KalshiClient:
     keys = load_keys()
     if need_auth and not keys:
-        print("No API keys yet - run Setup (1) first.")
+        print("No API key yet - run Login (1) first.")
         sys.exit(1)
     kid, kpath = keys if keys else (None, None)
     return KalshiClient(s.base_url, kid, kpath, s.time_in_force)
@@ -239,10 +240,13 @@ def main(argv: list[str]) -> None:
     cmd = argv[0] if argv else None
     if cmd is None:
         print(MENU)
-        cmd = {"1": "setup", "2": "check", "3": "paper", "4": "live", "5": "backtest",
+        cmd = {"1": "login", "2": "check", "3": "paper", "4": "live", "5": "backtest",
                "6": "synthetic", "7": "record"}.get(input("Choose 1-8: ").strip(), "quit")
     try:
-        if cmd == "setup":
+        if cmd == "login":
+            from .login import run_login
+            asyncio.run(run_login())
+        elif cmd == "setup":            # text-only fallback
             do_setup()
         elif cmd == "check":
             asyncio.run(do_check())
