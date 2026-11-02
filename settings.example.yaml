@@ -15,11 +15,10 @@ reconcile_interval_s: 5.0
 stale_spot_s: 5.0
 stale_book_s: 4.0
 min_spot_sources: 2
-order_ttl_s: 3.0
 max_slippage: 0.01
 time_in_force: immediate_or_cancel
-price_format: cents
 taker_fee_rate: 0.07
+crypto_shard: -1
 settle_window_s: 60.0
 vol_fast_halflife_s: 300.0
 vol_slow_halflife_s: 3600.0

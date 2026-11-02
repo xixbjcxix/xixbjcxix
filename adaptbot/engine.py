@@ -127,6 +127,8 @@ class Engine:
             log.warning("sell blocked on %s: %s", t, block)
             return
         q, avg, fee, uncertain = await self.broker.execute(t, it, book)
+        if self.broker.fatal:
+            self.risk.halt(self.broker.fatal)
         if uncertain:
             self.need_reconcile = True
         if q <= 0:
@@ -425,7 +427,32 @@ async def preflight(s: Settings, c: KalshiClient, spot: SpotHub, broker) -> list
     return problems
 
 
-def make_broker(s: Settings, c: KalshiClient, live: bool):
+async def market_setup(s: Settings, c: KalshiClient) -> tuple[int, list[str]]:
+    """Read the crypto shard and fee schedule from Kalshi.  Returns (shard, problems)
+    and updates s.taker_fee_rate with the series fee multiplier."""
+    problems, shard, mult = [], s.crypto_shard, 1.0
+    for series in s.series:
+        try:
+            meta = await c.series(series)
+            ft = str(meta.get("fee_type") or "quadratic")
+            if not ft.startswith("quadratic"):
+                problems.append(f"{series} fee_type {ft!r} is not supported")
+            mult = max(mult, float(meta.get("fee_multiplier") or 1.0))
+        except Exception as e:  # noqa: BLE001
+            log.warning("series %s lookup failed (%r) - assuming fee multiplier 1", series, e)
+        if shard < 0:
+            try:
+                for m in await c.markets(series, status="open", limit=5):
+                    if m.get("exchange_index") not in (None, ""):
+                        shard = int(m["exchange_index"])
+                        break
+            except Exception as e:  # noqa: BLE001
+                log.warning("shard lookup for %s failed: %r", series, e)
+    s.taker_fee_rate = 0.07 * mult
+    return (shard if shard >= 0 else 2), problems
+
+
+def make_broker(s: Settings, c: KalshiClient, live: bool, shard: int = 0):
     if live:
-        return LiveBroker(c, s.taker_fee_rate, s.order_ttl_s)
+        return LiveBroker(c, s.taker_fee_rate, shard)
     return PaperBroker(s.paper_start_cash, s.taker_fee_rate, s.paper_slippage, s.paper_fill_ratio)

@@ -168,7 +168,7 @@ class _Bucket:
 # ---------------------------------------------------------------- client
 class KalshiClient:
     def __init__(self, base_url: str, key_id: str | None = None, key_path: str | None = None,
-                 price_format: str = "cents", time_in_force: str = "immediate_or_cancel"):
+                 time_in_force: str = "immediate_or_cancel"):
         self.base_url = base_url.rstrip("/")
         self.path_prefix = urlparse(self.base_url).path
         self.key_id = key_id
@@ -176,7 +176,6 @@ class KalshiClient:
         if key_path:
             with open(key_path, "rb") as f:
                 self.key = serialization.load_pem_private_key(f.read(), password=None)
-        self.price_format = price_format
         self.time_in_force = time_in_force
         self.session: aiohttp.ClientSession | None = None
         self.reads = _Bucket(8)
@@ -245,20 +244,45 @@ class KalshiClient:
         d = await self._req("GET", f"/markets/{ticker}/orderbook", params={"depth": depth})
         return parse_orderbook(d)
 
+    async def series(self, series: str) -> dict:
+        d = await self._req("GET", f"/series/{series}")
+        return d.get("series") or d
+
     # ---- portfolio (auth)
-    async def balance(self) -> float:
+    async def balances(self) -> dict[int, float]:
+        """Cash in dollars per exchange shard.  Kalshi runs crypto markets on their
+        own shard (2 since 2026-08-24); orders there need cash ON that shard."""
         d = await self._req("GET", "/portfolio/balance", auth=True)
-        v = dollars(d, "balance")
-        if v is None:
-            raise KalshiError(0, str(d), "/portfolio/balance")
-        return v
+        out: dict[int, float] = {}
+        for it in d.get("balance_breakdown") or []:
+            try:
+                out[int(it.get("exchange_index", 0))] = float(it.get("balance", 0))
+            except (TypeError, ValueError):
+                pass
+        if not out:
+            v = dollars(d, "balance")
+            if v is None:
+                raise KalshiError(0, str(d), "/portfolio/balance")
+            out[0] = v
+        return out
+
+    async def balance(self, shard: int = 0) -> float:
+        b = await self.balances()
+        return b.get(shard, 0.0) if len(b) > 1 or shard in b else next(iter(b.values()))
+
+    async def transfer_between_shards(self, amount: float, dest: int, source: int = 0) -> dict:
+        """Move your own cash between exchange shards of the same account."""
+        body = {"source": "event_contract", "destination": "event_contract",
+                "amount": int(round(amount * 10000)),          # centicents
+                "source_exchange_shard": int(source), "destination_exchange_shard": int(dest)}
+        return await self._req("POST", "/portfolio/intra_exchange_instance_transfer", body=body, auth=True)
 
     async def positions(self) -> dict[str, float]:
         """Signed contract count per ticker: +YES, -NO.  Only non-zero."""
         out: dict[str, float] = {}
         cursor = None
         for _ in range(20):
-            params = {"limit": 200, "count_filter": "position"}
+            params = {"limit": 200}
             if cursor:
                 params["cursor"] = cursor
             d = await self._req("GET", "/portfolio/positions", params=params, auth=True)
@@ -275,39 +299,73 @@ class KalshiClient:
         d = await self._req("GET", "/portfolio/orders", params={"status": "resting", "limit": 200}, auth=True)
         return [parse_order(o) for o in d.get("orders") or []]
 
-    async def get_order(self, order_id: str) -> dict:
-        d = await self._req("GET", f"/portfolio/orders/{order_id}", auth=True)
-        return parse_order(d.get("order") or d)
+    async def fills(self, order_id: str | None = None, min_ts: int | None = None) -> list[dict]:
+        params: dict = {"limit": 200}
+        if order_id:
+            params["order_id"] = order_id
+        if min_ts:
+            params["min_ts"] = min_ts
+        d = await self._req("GET", "/portfolio/fills", params=params, auth=True)
+        return d.get("fills") or []
 
-    async def cancel(self, order_id: str) -> None:
+    async def cancel(self, order_id: str, ticker: str | None = None) -> None:
         try:
-            await self._req("DELETE", f"/portfolio/orders/{order_id}", auth=True)
+            await self._req("DELETE", f"/portfolio/events/orders/{order_id}",
+                            params={"market_ticker": ticker} if ticker else None, auth=True)
         except KalshiError as e:
-            if e.status != 404:
+            if e.status not in (400, 404, 409):
                 raise
 
     async def place(self, ticker: str, action: str, side: str, qty: int, limit: float,
                     reduce_only: bool = False) -> dict:
-        cents = int(round(limit * 100))
-        cents = min(99, max(1, cents))
+        """V2 order (the V1 /portfolio/orders endpoints were retired in June 2026).
+
+        V2 orders are written on the YES book:
+          buy YES @p -> bid p        sell YES @p -> ask p
+          buy NO  @q -> ask 1-q      sell NO  @q -> bid 1-q
+        """
+        book_side, yes_px = v2_side_price(side, action, limit)
         body = {
             "ticker": ticker,
             "client_order_id": CLIENT_PREFIX + uuid.uuid4().hex[:20],
-            "action": action,
-            "side": side,
-            "count": int(qty),
-            "type": "limit",
+            "side": book_side,
+            "count": f"{float(qty):.2f}",
+            "price": f"{yes_px:.4f}",
+            "time_in_force": self.time_in_force,
+            "self_trade_prevention_type": "taker_at_cross",
         }
-        key = f"{side}_price"
-        if self.price_format == "dollars":
-            body[key + "_dollars"] = f"{cents / 100:.2f}"
-        else:
-            body[key] = cents
-        if self.time_in_force:
-            body["time_in_force"] = self.time_in_force
         if reduce_only:
             body["reduce_only"] = True
-        d = await self._req("POST", "/portfolio/orders", body=body, auth=True)
+        d = await self._req("POST", "/portfolio/events/orders", body=body, auth=True)
         o = parse_order(d.get("order") or d)
         o["client_id"] = o["client_id"] or body["client_order_id"]
         return o
+
+
+def v2_side_price(side: str, action: str, limit: float) -> tuple[str, float]:
+    """(YES-book side, YES-book price) for buying/selling `side` at `limit` (that side's price)."""
+    limit = min(0.99, max(0.01, round(limit, 2)))
+    buy = action == "buy"
+    if side == "yes":
+        return ("bid" if buy else "ask"), limit
+    return ("ask" if buy else "bid"), round(1.0 - limit, 4)
+
+
+def fill_price(f: dict, side: str) -> float:
+    """Price of a fill in terms of `side` (fills report the YES price)."""
+    yp = f.get("yes_price_dollars", f.get("yes_price_fixed"))
+    if yp not in (None, ""):
+        y = float(yp)
+    elif f.get("yes_price") is not None:
+        y = float(f["yes_price"]) / 100.0
+    else:
+        return 0.0
+    return y if side == "yes" else round(1.0 - y, 4)
+
+
+def fill_fee(f: dict) -> float:
+    for k in ("fee_cost", "fee_cost_dollars"):
+        v = f.get(k)
+        if v not in (None, ""):
+            return float(v)
+    return 0.0

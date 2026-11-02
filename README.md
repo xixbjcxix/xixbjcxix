@@ -60,14 +60,17 @@ Key limits (defaults): `bankroll 40`, `max_contracts_per_order 10`, `max_dollars
 `max_dollars_total 30`, `max_daily_loss 8`, `kelly_fraction 0.25`, `warmup_contracts 1`.
 See `settings.example.yaml` for everything.
 
-## Not verified yet
+## What has and hasn't been checked
 
-This was built where Kalshi and the exchanges could not be reached, so the API code has not been checked against the live API. Run **Check** and **PAPER** first. Things to watch:
-- Kalshi field names. The parser accepts both the cents format and the newer `_dollars` / `_fp` format.
-- Whether `time_in_force: immediate_or_cancel` and `reduce_only` are accepted. Change `time_in_force` in settings if orders are rejected. Leftover orders are cancelled after 3 s either way.
-- The old bot had to move cash to a separate "crypto exchange" balance. This bot does not do that transfer: make sure the cash is where Kalshi's crypto markets can use it.
+The Kalshi API details were ported from the old `kbot`, which ran live against Kalshi on 2026-10-02:
+- V2 order endpoint `/portfolio/events/orders`, with orders written on the YES book (the V1 order endpoints were retired in June 2026)
+- fill prices and fees taken from `/portfolio/fills`
+- cash read per exchange shard; crypto markets are on shard 2, and the bot offers to move cash there, as kbot did
+- the fee multiplier read from the series settings
 
-Synthetic backtests only prove the machinery works. Whether there is a real edge is decided by your recordings and paper results.
+This code itself was built where Kalshi and the exchanges could not be reached, so run **Check** and **PAPER** before LIVE.
+
+Note: kbot's `docs/RESULTS.md` profits came from **synthetic** data too. The only real evidence so far is the live day log, which lost $5.42 and had untracked positions. Synthetic backtests here also only prove the machinery works. Whether there is a real edge is decided by your recordings and paper results.
 
 ## Tests
 

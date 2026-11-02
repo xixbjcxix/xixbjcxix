@@ -18,7 +18,7 @@ from . import backtest as bt
 from .brain import Brain
 from .config import DATA_DIR, load_settings, save_settings, settings_path
 from .dashboard import start_dashboard
-from .engine import Engine, make_broker, preflight
+from .engine import Engine, make_broker, market_setup, preflight
 from .kalshi import KalshiClient, load_keys, save_keys
 from .recorder import Recorder, read_records
 from .risk import InstanceLock
@@ -66,7 +66,7 @@ def client_for(s, need_auth: bool) -> KalshiClient:
         print("No API keys yet - run Setup (1) first.")
         sys.exit(1)
     kid, kpath = keys if keys else (None, None)
-    return KalshiClient(s.base_url, kid, kpath, s.price_format, s.time_in_force)
+    return KalshiClient(s.base_url, kid, kpath, s.time_in_force)
 
 
 def do_setup() -> None:
@@ -88,7 +88,9 @@ async def do_check() -> None:
     try:
         if c.authed:
             try:
-                print(f"balance: ${await c.balance():.2f}")
+                shard, probs = await market_setup(s, c)
+                print(f"cash per exchange shard: {await c.balances()}  (crypto markets use shard {shard})")
+                print(f"fee rate: {s.taker_fee_rate:.4f}" + (f"  PROBLEMS: {probs}" if probs else ""))
                 print(f"positions: {await c.positions() or 'none'}")
             except Exception as e:  # noqa: BLE001
                 print(f"auth check FAILED: {e!r}")
@@ -124,22 +126,29 @@ async def do_run(live: bool, trade: bool = True) -> None:
     c = client_for(s, need_auth=live)
     spot = SpotHub(s.assets, s.stale_spot_s, s.min_spot_sources)
     spot.start()
-    brain = Brain(s)
-    if brain.load():
-        print(f"loaded learning state ({brain.selector.current}, calibration n={brain.cal.n})")
-    broker = make_broker(s, c, live)
     try:
+        shard, problems = await market_setup(s, c)
+        if problems:
+            print("Cannot trade these markets:\n  - " + "\n  - ".join(problems))
+            return
+        print(f"  fee rate {s.taker_fee_rate:.4f} x C x P x (1-P)   crypto exchange shard {shard}")
+        brain = Brain(s)
+        if brain.load():
+            print(f"loaded learning state ({brain.selector.current}, calibration n={brain.cal.n})")
+        broker = make_broker(s, c, live, shard)
         if live:
             print("\n" + "!" * 66 + "\n  LIVE TRADING - REAL MONEY\n" + "!" * 66)
             print(f"  assets {s.assets}  bankroll ${s.bankroll}  max/order {s.max_contracts_per_order} contracts")
             print(f"  max $/market {s.max_dollars_per_market}  max $ total {s.max_dollars_total}"
                   f"  daily loss stop ${s.max_daily_loss}")
+            if not await ensure_shard_cash(s, c, shard):
+                return
             print("  preflight...")
             problems = await preflight(s, c, spot, broker)
             if problems:
                 print("PREFLIGHT FAILED - not trading:\n  - " + "\n  - ".join(problems))
                 return
-            n = await broker.cancel_own_resting()
+            n = await broker.cancel_own_resting(tuple(s.series))
             if n:
                 print(f"  cancelled {n} leftover bot orders")
             if input("Type START to trade real money: ").strip() != "START":
@@ -157,6 +166,43 @@ async def do_run(live: bool, trade: bool = True) -> None:
         await spot.stop()
         await c.close()
         lock.release()
+
+
+async def ensure_shard_cash(s, c: KalshiClient, shard: int) -> bool:
+    """Crypto markets trade on their own exchange shard and need cash there.
+    Offers (with your yes) to move cash inside your own account."""
+    try:
+        bal = await c.balances()
+    except Exception as e:  # noqa: BLE001
+        print(f"  balance request failed: {e!r}")
+        return False
+    have, main = bal.get(shard, 0.0), bal.get(0, 0.0) if shard != 0 else 0.0
+    print(f"  cash on the crypto exchange (shard {shard}): ${have:,.2f}"
+          + (f"   on the default exchange (shard 0): ${main:,.2f}" if shard != 0 else ""))
+    need = s.max_dollars_total
+    if have >= need or shard == 0:
+        return True
+    move = round(min(need - have, main), 2)
+    if move < 1.0:
+        print(f"  only ${have:.2f} on the crypto exchange - deposit or move money on kalshi.com,"
+              " or lower max_dollars_total")
+        return have >= s.max_dollars_per_market
+    if not input(f"  The limits need up to ${need:,.2f} there. Move ${move:,.2f} from the default exchange"
+                 " now? (y/N): ").strip().lower().startswith("y"):
+        return have >= s.max_dollars_per_market
+    try:
+        r = await c.transfer_between_shards(move, dest=shard, source=0)
+    except Exception as e:  # noqa: BLE001
+        print(f"  transfer failed: {e!r} - you can move it on kalshi.com instead")
+        return have >= s.max_dollars_per_market
+    print(f"  transfer requested ({r.get('transfer_id', '?')}), waiting...")
+    for _ in range(10):
+        await asyncio.sleep(1)
+        have = (await c.balances()).get(shard, 0.0)
+        if have >= need - 0.01:
+            break
+    print(f"  cash on the crypto exchange now: ${have:,.2f}")
+    return have >= s.max_dollars_per_market
 
 
 def do_backtest(args: list[str]) -> None:

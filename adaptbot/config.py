@@ -40,11 +40,10 @@ class Settings:
     min_spot_sources: int = 2
 
     # --- execution ---
-    order_ttl_s: float = 3.0           # cancel anything still resting after this
     max_slippage: float = 0.01
     time_in_force: str = "immediate_or_cancel"
-    price_format: str = "cents"        # "cents" -> yes_price, "dollars" -> yes_price_dollars
-    taker_fee_rate: float = 0.07
+    taker_fee_rate: float = 0.07       # x the series fee_multiplier, read from Kalshi at start
+    crypto_shard: int = -1             # -1 = read from the markets (crypto is on shard 2)
 
     # --- model ---
     settle_window_s: float = 60.0
