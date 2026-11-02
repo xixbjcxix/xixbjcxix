@@ -19,6 +19,7 @@ import aiohttp
 import yaml
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from .config import DATA_DIR
 from .market import Book, MarketMeta
@@ -202,11 +203,14 @@ class KalshiClient:
             return {}
         ts = str(int(time.time() * 1000))
         msg = (ts + method.upper() + self.path_prefix + path).encode()
-        sig = self.key.sign(
-            msg,
-            padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.DIGEST_LENGTH),
-            hashes.SHA256(),
-        )
+        if isinstance(self.key, Ed25519PrivateKey):
+            sig = self.key.sign(msg)            # Ed25519 keys sign the message directly
+        else:
+            sig = self.key.sign(
+                msg,
+                padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.DIGEST_LENGTH),
+                hashes.SHA256(),
+            )
         return {
             "KALSHI-ACCESS-KEY": self.key_id,
             "KALSHI-ACCESS-SIGNATURE": base64.b64encode(sig).decode(),

@@ -211,3 +211,16 @@ def test_risk_limits_and_daily_stop():
     assert r.check(Intent("buy", "yes", 1, 0.5, ""), pos, {"T": pos})        # entries blocked
     pos.apply_buy("yes", 2, 0.5, 0.0)
     assert r.check(Intent("sell", "yes", 2, 0.4, ""), pos, {"T": pos}) == ""  # exits still allowed
+
+
+def test_ed25519_signature_verifies(tmp_path):
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    key = Ed25519PrivateKey.generate()
+    kp = tmp_path / "k.pem"
+    kp.write_bytes(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                     serialization.NoEncryption()))
+    c = KalshiClient("https://api.elections.kalshi.com/trade-api/v2", "kid", str(kp))
+    h = c._headers("GET", "/portfolio/balance")
+    msg = (h["KALSHI-ACCESS-TIMESTAMP"] + "GET" + "/trade-api/v2/portfolio/balance").encode()
+    key.public_key().verify(base64.b64decode(h["KALSHI-ACCESS-SIGNATURE"]), msg)
