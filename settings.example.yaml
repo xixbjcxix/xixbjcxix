@@ -1,0 +1,158 @@
+assets:
+- btc
+kalshi_env: prod
+kalshi_base_url: ''
+poll_interval_s: 1.0
+bankroll: 40.0
+max_contracts_per_order: 10
+max_dollars_per_market: 12.0
+max_dollars_total: 30.0
+max_daily_loss: 8.0
+max_consecutive_losses: 4
+cooldown_markets: 2
+flatten_on_halt: true
+reconcile_interval_s: 5.0
+stale_spot_s: 5.0
+stale_book_s: 4.0
+min_spot_sources: 2
+order_ttl_s: 3.0
+max_slippage: 0.01
+time_in_force: immediate_or_cancel
+price_format: cents
+taker_fee_rate: 0.07
+settle_window_s: 60.0
+vol_fast_halflife_s: 300.0
+vol_slow_halflife_s: 3600.0
+vol_floor: 3.0e-05
+vol_mult: 1.0
+calibration: true
+kelly_fraction: 0.25
+adaptive: true
+default_profile: early_cut
+min_markets_before_trusting: 12
+score_halflife_markets: 30.0
+score_k: 0.5
+switch_margin: 0.02
+sit_out_when_no_edge: true
+min_profile_trades: 8
+warmup_contracts: 1
+shadow_slippage: 0.01
+shadow_fill_ratio: 0.7
+paper_start_cash: 40.0
+paper_slippage: 0.01
+paper_fill_ratio: 0.7
+dashboard_port: 8787
+record: true
+profiles:
+- name: early_cut
+  entry_start_s: 30
+  entry_end_s: 300
+  min_edge: 0.06
+  confirm_s: 3
+  min_price: 0.2
+  max_price: 0.8
+  max_spread: 0.06
+  cut_loss: 0.1
+  trail: null
+  tp_margin: 0.03
+  exit_before_close_s: 90
+  hold_conf: 0.85
+  max_entries: 1
+  add_edge: 0.1
+  kelly_mult: 1.0
+- name: early_trail
+  entry_start_s: 30
+  entry_end_s: 300
+  min_edge: 0.06
+  confirm_s: 3
+  min_price: 0.2
+  max_price: 0.8
+  max_spread: 0.06
+  cut_loss: 0.15
+  trail: 0.1
+  tp_margin: 0.03
+  exit_before_close_s: 90
+  hold_conf: 0.85
+  max_entries: 1
+  add_edge: 0.1
+  kelly_mult: 1.0
+- name: early_hold
+  entry_start_s: 30
+  entry_end_s: 300
+  min_edge: 0.06
+  confirm_s: 3
+  min_price: 0.2
+  max_price: 0.8
+  max_spread: 0.06
+  cut_loss: null
+  trail: null
+  tp_margin: 0.05
+  exit_before_close_s: 0
+  hold_conf: 0.85
+  max_entries: 1
+  add_edge: 0.1
+  kelly_mult: 1.0
+- name: sniper
+  entry_start_s: 30
+  entry_end_s: 180
+  min_edge: 0.1
+  confirm_s: 5
+  min_price: 0.2
+  max_price: 0.8
+  max_spread: 0.06
+  cut_loss: 0.08
+  trail: null
+  tp_margin: 0.03
+  exit_before_close_s: 90
+  hold_conf: 0.85
+  max_entries: 1
+  add_edge: 0.1
+  kelly_mult: 1.0
+- name: balanced
+  entry_start_s: 60
+  entry_end_s: 480
+  min_edge: 0.07
+  confirm_s: 3
+  min_price: 0.2
+  max_price: 0.8
+  max_spread: 0.06
+  cut_loss: 0.12
+  trail: null
+  tp_margin: 0.03
+  exit_before_close_s: 90
+  hold_conf: 0.85
+  max_entries: 1
+  add_edge: 0.1
+  kelly_mult: 1.0
+- name: patient
+  entry_start_s: 120
+  entry_end_s: 600
+  min_edge: 0.05
+  confirm_s: 3
+  min_price: 0.2
+  max_price: 0.8
+  max_spread: 0.06
+  cut_loss: 0.15
+  trail: null
+  tp_margin: 0.03
+  exit_before_close_s: 90
+  hold_conf: 0.85
+  max_entries: 1
+  add_edge: 0.1
+  kelly_mult: 1.0
+- name: late_favorite
+  entry_start_s: 540
+  entry_end_s: 810
+  min_edge: 0.04
+  confirm_s: 3
+  min_price: 0.55
+  max_price: 0.93
+  max_spread: 0.06
+  cut_loss: 0.12
+  trail: null
+  tp_margin: 0.03
+  exit_before_close_s: 90
+  hold_conf: 0.75
+  max_entries: 1
+  add_edge: 0.1
+  kelly_mult: 1.0
